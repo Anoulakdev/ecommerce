@@ -12,25 +12,31 @@ const cors = require("cors");
 const path = require("path");
 
 // ✅ ดึงค่า ALLOWED_ORIGINS จาก .env และแปลงเป็น array
-const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [];
+// const allowedOrigins = process.env.ALLOWED_ORIGINS?.split(",") || [];
 
-app.use(
-  cors({
-    origin: function (origin, callback) {
-      if (!origin) return callback(null, true); // อนุญาต Postman/curl
-      if (allowedOrigins.includes(origin)) {
-        return callback(null, true);
-      } else {
-        return callback(new Error("Not allowed by CORS"));
-      }
-    },
-    credentials: true,
-  })
-);
+// app.use(
+//   cors({
+//     origin: function (origin, callback) {
+//       if (!origin) return callback(null, true); // อนุญาต Postman/curl
+//       if (allowedOrigins.includes(origin)) {
+//         return callback(null, true);
+//       } else {
+//         return callback(new Error("Not allowed by CORS"));
+//       }
+//     },
+//     credentials: true,
+//   })
+// );
 
 // middleware
 app.use(morgan("dev"));
 app.use(bodyParser.json());
+app.use(
+  cors({
+    origin: "*",
+    credentials: true,
+  })
+);
 
 const UPLOAD_BASE_PATH = process.env.UPLOAD_BASE_PATH;
 
