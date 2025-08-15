@@ -31,12 +31,7 @@ const path = require("path");
 // middleware
 app.use(morgan("dev"));
 app.use(bodyParser.json());
-app.use(
-  cors({
-    origin: "*",
-    credentials: true,
-  })
-);
+app.use(cors());
 
 const UPLOAD_BASE_PATH = process.env.UPLOAD_BASE_PATH;
 
