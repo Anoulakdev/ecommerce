@@ -70,6 +70,11 @@ exports.create = (req, res) => {
 exports.list = async (req, res) => {
   try {
     const products = await prisma.product.findMany({
+      where: {
+        categoryId: req.query.categoryId
+          ? Number(req.query.categoryId)
+          : undefined,
+      },
       orderBy: {
         id: "desc",
       },

@@ -14,62 +14,63 @@ enum Gender {
 }
 
 model User {
-  id               Int         @id @default(autoincrement())
-  username         String      @unique @db.VarChar(255)
-  password         String      @db.VarChar(255)
-  code             String?     @unique @db.VarChar(255)
-  firstname        String      @db.VarChar(255)
-  lastname         String      @db.VarChar(255)
-  actived          String      @default("A") @db.VarChar(50)
+  id               Int           @id @default(autoincrement())
+  username         String        @unique @db.VarChar(255)
+  password         String        @db.VarChar(255)
+  code             String?       @unique @db.VarChar(255)
+  firstname        String        @db.VarChar(255)
+  lastname         String        @db.VarChar(255)
+  actived          String        @default("A") @db.VarChar(50)
   gender           Gender
-  tel              String?     @db.VarChar(255)
-  userimg          String?     @db.VarChar(255)
+  tel              String?       @db.VarChar(255)
+  userimg          String?       @db.VarChar(255)
   roleId           Int?
-  role             Role?       @relation(fields: [roleId], references: [id])
+  role             Role?         @relation(fields: [roleId], references: [id])
   positionId       Int?
-  position         Position?   @relation(fields: [positionId], references: [id])
+  position         Position?     @relation(fields: [positionId], references: [id])
   unitId           Int?
-  unit             Unit?       @relation(fields: [unitId], references: [id])
+  unit             Unit?         @relation(fields: [unitId], references: [id])
   chuId            Int?
-  chu              Chu?        @relation(fields: [chuId], references: [id])
-  datebirth        DateTime?   @db.Timestamptz(0)
-  tribe            String?     @db.VarChar(255)
-  religion         String?     @db.VarChar(255)
-  villagebirth     String?     @db.VarChar(255)
-  districtbirth    String?     @db.VarChar(255)
-  provincebirth    String?     @db.VarChar(255)
-  villagenow       String?     @db.VarChar(255)
-  districtnow      String?     @db.VarChar(255)
-  provincenow      String?     @db.VarChar(255)
-  edusaman         String?     @db.VarChar(255)
-  edulevel         String?     @db.VarChar(255)
-  edusubject       String?     @db.VarChar(255)
-  edutheory        String?     @db.VarChar(255)
-  phaksupport      DateTime?   @db.Timestamptz(0)
-  phakrule         DateTime?   @db.Timestamptz(0)
-  phaksamhong      DateTime?   @db.Timestamptz(0)
-  phaksomboun      DateTime?   @db.Timestamptz(0)
-  phakposition     String?     @db.VarChar(255)
-  phakcard         String?     @db.VarChar(255)
-  phakissuedcard   DateTime?   @db.Timestamptz(0)
-  phakbook         String?     @db.VarChar(255)
-  latcomein        DateTime?   @db.Timestamptz(0)
-  latposition      String?     @db.VarChar(255)
-  kammabancomein   DateTime?   @db.Timestamptz(0)
-  kammabanposition String?     @db.VarChar(255)
-  youthcomein      DateTime?   @db.Timestamptz(0)
-  womencomein      DateTime?   @db.Timestamptz(0)
-  womenposition    String?     @db.VarChar(255)
+  chu              Chu?          @relation(fields: [chuId], references: [id])
+  datebirth        DateTime?     @db.Timestamptz(0)
+  tribe            String?       @db.VarChar(255)
+  religion         String?       @db.VarChar(255)
+  villagebirth     String?       @db.VarChar(255)
+  districtbirth    String?       @db.VarChar(255)
+  provincebirth    String?       @db.VarChar(255)
+  villagenow       String?       @db.VarChar(255)
+  districtnow      String?       @db.VarChar(255)
+  provincenow      String?       @db.VarChar(255)
+  edusaman         String?       @db.VarChar(255)
+  edulevel         String?       @db.VarChar(255)
+  edusubject       String?       @db.VarChar(255)
+  edutheory        String?       @db.VarChar(255)
+  phaksupport      DateTime?     @db.Timestamptz(0)
+  phakrule         DateTime?     @db.Timestamptz(0)
+  phaksamhong      DateTime?     @db.Timestamptz(0)
+  phaksomboun      DateTime?     @db.Timestamptz(0)
+  phakposition     String?       @db.VarChar(255)
+  phakcard         String?       @db.VarChar(255)
+  phakissuedcard   DateTime?     @db.Timestamptz(0)
+  phakbook         String?       @db.VarChar(255)
+  latcomein        DateTime?     @db.Timestamptz(0)
+  latposition      String?       @db.VarChar(255)
+  kammabancomein   DateTime?     @db.Timestamptz(0)
+  kammabanposition String?       @db.VarChar(255)
+  youthcomein      DateTime?     @db.Timestamptz(0)
+  womencomein      DateTime?     @db.Timestamptz(0)
+  womenposition    String?       @db.VarChar(255)
   arts             String[]
   sports           String[]
   fbusiness        String[]
   ideas            String[]
-  createdAt        DateTime    @default(now()) @db.Timestamptz(0)
-  updatedAt        DateTime    @updatedAt @db.Timestamptz(0)
-  detailacts       DetailAct[] @relation("userRelation")
-  products         Product[]   @relation("userProductRelation")
-  orders           Order[]     @relation("userOrderRelation")
-  reviews          Review[]    @relation("userReviewRelation")
+  createdAt        DateTime      @default(now()) @db.Timestamptz(0)
+  updatedAt        DateTime      @updatedAt @db.Timestamptz(0)
+  detailacts       DetailAct[]   @relation("userRelation")
+  products         Product[]     @relation("userProductRelation")
+  orders           Order[]       @relation("userOrderRelation")
+  reviews          Review[]      @relation("userReviewRelation")
+  productsFavorite UserProduct[] @relation("userProductFavorite")
 }
 
 model Role {
@@ -151,25 +152,34 @@ model Category {
 }
 
 model Product {
-  id            Int         @id @default(autoincrement())
+  id            Int           @id @default(autoincrement())
   categoryId    Int
-  category      Category    @relation(fields: [categoryId], references: [id])
+  category      Category      @relation(fields: [categoryId], references: [id])
   productunitId Int
-  productunit   ProductUnit @relation(fields: [productunitId], references: [id])
-  userCode      String      @db.VarChar(255)
-  user          User        @relation(fields: [userCode], references: [code], name: "userProductRelation")
-  actived       String      @default("A") @db.VarChar(50)
-  title         String?     @db.VarChar(255)
-  detail        String?     @db.Text
-  price         Decimal?    @db.Decimal(10, 2)
-  pimg          String?     @db.VarChar(255)
-  favorite      Boolean?    @default(false)
-  createdAt     DateTime    @default(now()) @db.Timestamptz(0)
-  updatedAt     DateTime    @updatedAt @db.Timestamptz(0)
+  productunit   ProductUnit   @relation(fields: [productunitId], references: [id])
+  userCode      String        @db.VarChar(255)
+  user          User          @relation(fields: [userCode], references: [code], name: "userProductRelation")
+  actived       String        @default("A") @db.VarChar(50)
+  title         String?       @db.VarChar(255)
+  detail        String?       @db.Text
+  price         Decimal?      @db.Decimal(10, 2)
+  pimg          String?       @db.VarChar(255)
+  createdAt     DateTime      @default(now()) @db.Timestamptz(0)
+  updatedAt     DateTime      @updatedAt @db.Timestamptz(0)
+  users         UserProduct[]
   orders        Order[]
   reviews       Review[]
 
   @@index([categoryId])
+}
+
+model UserProduct {
+  userCode  String  @db.VarChar(255)
+  user      User    @relation(fields: [userCode], references: [code], name: "userProductFavorite")
+  productId Int
+  product   Product @relation(fields: [productId], references: [id])
+
+  @@id([userCode, productId]) // composite primary key
 }
 
 model ProductUnit {
@@ -214,6 +224,7 @@ model Bank {
   name        String   @db.VarChar(255)
   accountNo   String?  @db.VarChar(255)
   accountName String?  @db.VarChar(255)
+  banklogo    String?  @db.VarChar(255)
   bankqr      String?  @db.VarChar(255)
   createdAt   DateTime @default(now()) @db.Timestamptz(0)
   updatedAt   DateTime @updatedAt @db.Timestamptz(0)

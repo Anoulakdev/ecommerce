@@ -16,7 +16,10 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({ storage: storage }).single("bankqr");
+const upload = multer({ storage }).fields([
+  { name: "banklogo", maxCount: 1 },
+  { name: "bankqr", maxCount: 1 },
+]);
 
 exports.create = (req, res) => {
   upload(req, res, async function (err) {
@@ -49,7 +52,8 @@ exports.create = (req, res) => {
           name,
           accountNo,
           accountName,
-          bankqr: req.file ? `${req.file.filename}` : null,
+          banklogo: req.files?.banklogo?.[0]?.filename || null,
+          bankqr: req.files?.bankqr?.[0]?.filename || null,
         },
       });
 
@@ -151,24 +155,36 @@ exports.update = async (req, res) => {
       }
 
       // Step 2: If a new photo is uploaded and an old photo exists, delete the old photo
-      let bankfilePath = banks.bankqr; // Keep old photo path
-      if (req.file) {
-        // Only attempt to delete if there is an existing photo path
+      let banklogoPath = banks.banklogo;
+      let bankqrPath = banks.bankqr;
+
+      if (req.files?.banklogo?.[0]) {
+        if (banks.banklogo) {
+          const oldLogoPath = path.join(
+            process.env.UPLOAD_BASE_PATH,
+            "bank",
+            path.basename(banks.banklogo)
+          );
+          fs.unlink(oldLogoPath, (err) => {
+            if (err) console.error("Error deleting old banklogo: ", err);
+          });
+        }
+        banklogoPath = req.files.banklogo[0].filename;
+      }
+
+      // ถ้ามีการอัปโหลด bankqr ใหม่ → ลบไฟล์เก่า + อัปเดต path
+      if (req.files?.bankqr?.[0]) {
         if (banks.bankqr) {
-          const oldBankFilePath = path.join(
+          const oldQrPath = path.join(
             process.env.UPLOAD_BASE_PATH,
             "bank",
             path.basename(banks.bankqr)
           );
-          fs.unlink(oldBankFilePath, (err) => {
-            if (err) {
-              console.error("Error deleting old file: ", err);
-            }
+          fs.unlink(oldQrPath, (err) => {
+            if (err) console.error("Error deleting old bankqr: ", err);
           });
         }
-
-        // Set the new photo path
-        bankfilePath = `${req.file.filename}`;
+        bankqrPath = req.files.bankqr[0].filename;
       }
 
       // Step 3: Update the user record
@@ -180,7 +196,8 @@ exports.update = async (req, res) => {
           name,
           accountNo,
           accountName,
-          bankqr: bankfilePath,
+          banklogo: banklogoPath,
+          bankqr: bankqrPath,
         },
       });
 
@@ -208,19 +225,25 @@ exports.remove = async (req, res) => {
     }
 
     // Step 2: Delete the photo file if it exists
-    if (banks.bankqr) {
-      const bankfilePath = path.join(
+    if (banks.banklogo) {
+      const logoPath = path.join(
         process.env.UPLOAD_BASE_PATH,
         "bank",
-        banks.bankqr
+        path.basename(banks.banklogo)
       );
-      fs.unlink(bankfilePath, (err) => {
-        if (err) {
-          console.error("Error deleting userimg file: ", err);
-          return res
-            .status(500)
-            .json({ message: "Error deleting userimg file" });
-        }
+      fs.unlink(logoPath, (err) => {
+        if (err) console.error("Error deleting banklogo file: ", err);
+      });
+    }
+
+    if (banks.bankqr) {
+      const qrPath = path.join(
+        process.env.UPLOAD_BASE_PATH,
+        "bank",
+        path.basename(banks.bankqr)
+      );
+      fs.unlink(qrPath, (err) => {
+        if (err) console.error("Error deleting bankqr file: ", err);
       });
     }
 
