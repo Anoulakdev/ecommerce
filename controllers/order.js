@@ -236,75 +236,137 @@ exports.listProcess = async (req, res) => {
   }
 };
 
-// exports.getById = async (req, res) => {
-//   try {
-//     const { reviewId } = req.params;
+exports.listSeller = async (req, res) => {
+  try {
+    const orders = await prisma.order.findMany({
+      where: {
+        product: { userCode: req.user.code },
+      },
+      orderBy: {
+        id: "desc",
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstname: true,
+            lastname: true,
+            code: true,
+            unit: {
+              select: {
+                name: true,
+              },
+            },
+            chu: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+        product: {
+          select: {
+            id: true,
+            title: true,
+            pimg: true,
+          },
+        },
+        orderDetails: {
+          orderBy: { id: "desc" }, // ล่าสุดก่อน
+          take: 1,
+          include: { productstatus: true },
+        },
+      },
+    });
 
-//     const review = await prisma.review.findUnique({
-//       where: {
-//         id: Number(reviewId),
-//       },
-//     });
+    const formatted = orders.map((order) => ({
+      ...order,
+      createdAt: moment(order.createdAt)
+        .tz("Asia/Vientiane")
+        .format("YYYY-MM-DD HH:mm:ss"),
+      updatedAt: moment(order.updatedAt)
+        .tz("Asia/Vientiane")
+        .format("YYYY-MM-DD HH:mm:ss"),
+    }));
 
-//     if (!review) {
-//       return res.status(404).json({ message: "review not found" });
-//     }
+    res.json(formatted);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
 
-//     const formatted = {
-//       ...review,
-//       createdAt: moment(review.createdAt)
-//         .tz("Asia/Vientiane")
-//         .format("YYYY-MM-DD HH:mm:ss"),
-//       updatedAt: moment(review.updatedAt)
-//         .tz("Asia/Vientiane")
-//         .format("YYYY-MM-DD HH:mm:ss"),
-//     };
+exports.getById = async (req, res) => {
+  try {
+    const { orderId } = req.params;
 
-//     res.json(formatted);
-//   } catch (err) {
-//     // err
-//     console.log(err);
-//     res.status(500).json({ message: "Server Error" });
-//   }
-// };
+    const order = await prisma.order.findUnique({
+      where: {
+        id: Number(orderId),
+      },
+      include: {
+        orderDetails: {
+          orderBy: { id: "desc" }, // ล่าสุดก่อน
+          include: {
+            productstatus: true,
+            user: {
+              select: {
+                id: true,
+                firstname: true,
+                lastname: true,
+                gender: true,
+              },
+            },
+          },
+        },
+      },
+    });
 
-// exports.update = async (req, res) => {
-//   try {
-//     const { reviewId } = req.params;
-//     const { productId, rating, comment } = req.body;
+    if (!order) {
+      return res.status(404).json({ message: "order not found" });
+    }
 
-//     const updated = await prisma.review.update({
-//       where: {
-//         id: Number(reviewId),
-//       },
-//       data: {
-//         productId: Number(productId),
-//         rating: rating ? Number(rating) : null,
-//         comment,
-//       },
-//     });
+    const formatted = {
+      ...order,
+      createdAt: moment(order.createdAt)
+        .tz("Asia/Vientiane")
+        .format("YYYY-MM-DD HH:mm:ss"),
+      updatedAt: moment(order.updatedAt)
+        .tz("Asia/Vientiane")
+        .format("YYYY-MM-DD HH:mm:ss"),
+      orderDetails: order.orderDetails.map((detail) => ({
+        ...detail,
+        createdAt: moment(detail.createdAt)
+          .tz("Asia/Vientiane")
+          .format("YYYY-MM-DD HH:mm:ss"),
+        paydate: detail.paydate
+          ? moment(detail.paydate)
+              .tz("Asia/Vientiane")
+              .format("YYYY-MM-DD HH:mm:ss")
+          : null,
+      })),
+    };
 
-//     res.json({ message: "Updated Success!! ", data: updated });
-//   } catch (err) {
-//     // err
-//     console.log(err);
-//     res.status(500).json({ message: "Server Error" });
-//   }
-// };
+    res.json(formatted);
+  } catch (err) {
+    // err
+    console.log(err);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
 
-// exports.remove = async (req, res) => {
-//   try {
-//     const { reviewId } = req.params;
+exports.remove = async (req, res) => {
+  try {
+    const { orderId } = req.params;
 
-//     const removed = await prisma.review.delete({
-//       where: {
-//         id: Number(reviewId),
-//       },
-//     });
+    await prisma.$transaction([
+      prisma.orderDetail.deleteMany({ where: { orderId: Number(orderId) } }),
+      prisma.order.delete({ where: { id: Number(orderId) } }),
+    ]);
 
-//     res.status(200).json({ message: "chu deleted successfully!" });
-//   } catch (err) {
-//     console.log(err);
-//     res.status(500).json({ message: "Server Error" });
-//   }
-// };
+    res.status(200).json({ message: "order deleted successfully!" });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server Error" });
+  }
+};

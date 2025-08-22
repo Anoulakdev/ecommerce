@@ -6,9 +6,9 @@ const {
   listOrder,
   listCancel,
   listProcess,
+  listSeller,
   getById,
   create,
-  update,
   remove,
 } = require("../controllers/order");
 // middleware
@@ -20,12 +20,12 @@ router.get("/ordercancle", auth, listCancel);
 
 router.get("/orderprocess", auth, listProcess);
 
-// router.get("/orders/:orderId", auth, getById);
+router.get("/orderseller", auth, listSeller);
+
+router.get("/orders/:orderId", auth, getById);
 
 router.post("/orders", auth, create);
 
-// router.put("/orders/:orderId", auth, update);
-
-// router.delete("/orders/:orderId", auth, remove);
+router.delete("/orders/:orderId", auth, remove);
 
 module.exports = router;
