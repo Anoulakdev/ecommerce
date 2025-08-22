@@ -69,6 +69,7 @@ model User {
   detailacts       DetailAct[]   @relation("userRelation")
   products         Product[]     @relation("userProductRelation")
   orders           Order[]       @relation("userOrderRelation")
+  orderDetails     OrderDetail[] @relation("userOrderDetailRelation")
   reviews          Review[]      @relation("userReviewRelation")
   productsFavorite UserProduct[] @relation("userProductFavorite")
 }
@@ -190,33 +191,43 @@ model ProductUnit {
 }
 
 model ProductStatus {
-  id     Int     @id @default(autoincrement())
-  name   String  @db.VarChar(255)
-  code   String? @db.VarChar(255)
-  orders Order[]
+  id           Int           @id @default(autoincrement())
+  name         String        @db.VarChar(255)
+  code         String?       @db.VarChar(255)
+  orderDetails OrderDetail[]
 }
 
 model Order {
+  id           Int           @id @default(autoincrement())
+  orderNo      String        @unique @db.VarChar(255)
+  productId    Int
+  product      Product       @relation(fields: [productId], references: [id])
+  userCode     String        @db.VarChar(255)
+  user         User          @relation(fields: [userCode], references: [code], name: "userOrderRelation")
+  quantity     Int?          @default(1)
+  price        Decimal?      @db.Decimal(10, 2)
+  totalprice   Decimal?      @db.Decimal(10, 2)
+  createdAt    DateTime      @default(now()) @db.Timestamptz(0)
+  updatedAt    DateTime      @updatedAt @db.Timestamptz(0)
+  orderDetails OrderDetail[]
+
+  @@index([productId])
+}
+
+model OrderDetail {
   id              Int           @id @default(autoincrement())
-  orderNo         String        @unique @db.VarChar(255)
-  productId       Int
-  product         Product       @relation(fields: [productId], references: [id])
+  orderId         Int
+  order           Order         @relation(fields: [orderId], references: [id])
   userCode        String        @db.VarChar(255)
-  user            User          @relation(fields: [userCode], references: [code], name: "userOrderRelation")
+  user            User          @relation(fields: [userCode], references: [code], name: "userOrderDetailRelation")
   productstatusId Int
   productstatus   ProductStatus @relation(fields: [productstatusId], references: [id])
-  bankId          Int?
-  bank            Bank?         @relation(fields: [bankId], references: [id])
-  quantity        Int?          @default(1)
-  price           Decimal?      @db.Decimal(10, 2)
-  totalprice      Decimal?      @db.Decimal(10, 2)
   comment         String?       @db.Text
   payimg          String?       @db.VarChar(255)
   paydate         DateTime?     @db.Timestamptz(0)
   createdAt       DateTime      @default(now()) @db.Timestamptz(0)
-  updatedAt       DateTime      @updatedAt @db.Timestamptz(0)
 
-  @@index([productId])
+  @@index([orderId])
 }
 
 model Bank {
@@ -228,7 +239,6 @@ model Bank {
   bankqr      String?  @db.VarChar(255)
   createdAt   DateTime @default(now()) @db.Timestamptz(0)
   updatedAt   DateTime @updatedAt @db.Timestamptz(0)
-  orders      Order[]
 }
 
 model Review {
