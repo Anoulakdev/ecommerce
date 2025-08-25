@@ -4,6 +4,7 @@ const router = express.Router();
 // controllers
 const {
   list,
+  getProduct,
   getById,
   create,
   update,
@@ -13,6 +14,8 @@ const {
 const { auth, checkRole } = require("../middleware/auth");
 
 router.get("/products", auth, list);
+
+router.get("/products/getproduct", auth, getProduct);
 
 router.get("/products/:productId", auth, getById);
 

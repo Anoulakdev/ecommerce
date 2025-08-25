@@ -50,29 +50,30 @@ exports.listOrder = async (req, res) => {
         id: "desc",
       },
       include: {
-        user: {
-          select: {
-            id: true,
-            firstname: true,
-            lastname: true,
-            code: true,
-            unit: {
-              select: {
-                name: true,
-              },
-            },
-            chu: {
-              select: {
-                name: true,
-              },
-            },
-          },
-        },
         product: {
           select: {
             id: true,
             title: true,
             pimg: true,
+            user: {
+              select: {
+                id: true,
+                firstname: true,
+                lastname: true,
+                code: true,
+                tel: true,
+                unit: {
+                  select: {
+                    name: true,
+                  },
+                },
+                chu: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
           },
         },
         orderDetails: {
@@ -115,29 +116,30 @@ exports.listCancel = async (req, res) => {
         id: "desc",
       },
       include: {
-        user: {
-          select: {
-            id: true,
-            firstname: true,
-            lastname: true,
-            code: true,
-            unit: {
-              select: {
-                name: true,
-              },
-            },
-            chu: {
-              select: {
-                name: true,
-              },
-            },
-          },
-        },
         product: {
           select: {
             id: true,
             title: true,
             pimg: true,
+            user: {
+              select: {
+                id: true,
+                firstname: true,
+                lastname: true,
+                code: true,
+                tel: true,
+                unit: {
+                  select: {
+                    name: true,
+                  },
+                },
+                chu: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
           },
         },
         orderDetails: {
@@ -180,29 +182,30 @@ exports.listProcess = async (req, res) => {
         id: "desc",
       },
       include: {
-        user: {
-          select: {
-            id: true,
-            firstname: true,
-            lastname: true,
-            code: true,
-            unit: {
-              select: {
-                name: true,
-              },
-            },
-            chu: {
-              select: {
-                name: true,
-              },
-            },
-          },
-        },
         product: {
           select: {
             id: true,
             title: true,
             pimg: true,
+            user: {
+              select: {
+                id: true,
+                firstname: true,
+                lastname: true,
+                code: true,
+                tel: true,
+                unit: {
+                  select: {
+                    name: true,
+                  },
+                },
+                chu: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
           },
         },
         orderDetails: {
@@ -252,6 +255,7 @@ exports.listSeller = async (req, res) => {
             firstname: true,
             lastname: true,
             code: true,
+            tel: true,
             unit: {
               select: {
                 name: true,

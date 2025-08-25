@@ -119,6 +119,57 @@ exports.list = async (req, res) => {
   }
 };
 
+exports.getProduct = async (req, res) => {
+  try {
+    const products = await prisma.product.findMany({
+      where: {
+        userCode: req.query.userCode,
+      },
+      orderBy: {
+        id: "asc",
+      },
+      include: {
+        category: true,
+        productunit: true,
+        user: {
+          select: {
+            id: true,
+            firstname: true,
+            lastname: true,
+            code: true,
+            tel: true,
+            unit: {
+              select: {
+                name: true,
+              },
+            },
+            chu: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    const formatted = products.map((product) => ({
+      ...product,
+      createdAt: moment(product.createdAt)
+        .tz("Asia/Vientiane")
+        .format("YYYY-MM-DD HH:mm:ss"),
+      updatedAt: moment(product.updatedAt)
+        .tz("Asia/Vientiane")
+        .format("YYYY-MM-DD HH:mm:ss"),
+    }));
+
+    res.json(formatted);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
 exports.getById = async (req, res) => {
   try {
     const { productId } = req.params;
