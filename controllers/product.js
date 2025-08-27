@@ -99,18 +99,30 @@ exports.list = async (req, res) => {
             },
           },
         },
+        reviews: {
+          select: { rating: true },
+        },
       },
     });
 
-    const formatted = products.map((product) => ({
-      ...product,
-      createdAt: moment(product.createdAt)
-        .tz("Asia/Vientiane")
-        .format("YYYY-MM-DD HH:mm:ss"),
-      updatedAt: moment(product.updatedAt)
-        .tz("Asia/Vientiane")
-        .format("YYYY-MM-DD HH:mm:ss"),
-    }));
+    const formatted = products.map((product) => {
+      const ratings = product.reviews.map((r) => r.rating).filter(Boolean);
+      const avgRating =
+        ratings.length > 0
+          ? (ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(2)
+          : null;
+
+      return {
+        ...product,
+        avgRating, // ✅ ค่าเฉลี่ย rating
+        createdAt: moment(product.createdAt)
+          .tz("Asia/Vientiane")
+          .format("YYYY-MM-DD HH:mm:ss"),
+        updatedAt: moment(product.updatedAt)
+          .tz("Asia/Vientiane")
+          .format("YYYY-MM-DD HH:mm:ss"),
+      };
+    });
 
     res.json(formatted);
   } catch (err) {
@@ -199,6 +211,9 @@ exports.getById = async (req, res) => {
             },
           },
         },
+        reviews: {
+          select: { rating: true },
+        },
       },
     });
 
@@ -206,8 +221,27 @@ exports.getById = async (req, res) => {
       return res.status(404).json({ message: "products not found" });
     }
 
+    // ✅ คำนวณค่าเฉลี่ย rating
+    const ratings = product.reviews.map((r) => r.rating).filter(Boolean);
+    const avgRating =
+      ratings.length > 0
+        ? (ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(2)
+        : null;
+
+    // ✅ นับจำนวนแต่ละ rating 1-5
+    const ratingCounts = { 1: 0, 2: 0, 3: 0, 4: 0, 5: 0 };
+    ratings.forEach((r) => {
+      if (ratingCounts[r] !== undefined) {
+        ratingCounts[r]++;
+      }
+    });
+
+    // ✅ format response
     const formatted = {
       ...product,
+      avgRating,
+      reviewCount: ratings.length,
+      ratingCounts, // {1: x, 2: y, 3: z, 4: w, 5: k}
       createdAt: moment(product.createdAt)
         .tz("Asia/Vientiane")
         .format("YYYY-MM-DD HH:mm:ss"),

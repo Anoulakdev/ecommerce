@@ -7,6 +7,7 @@ const {
   listCancel,
   listProcess,
   listSeller,
+  listEcommerce,
   getById,
   create,
   remove,
@@ -21,6 +22,8 @@ router.get("/ordercancle", auth, listCancel);
 router.get("/orderprocess", auth, listProcess);
 
 router.get("/orderseller", auth, listSeller);
+
+router.get("/orderecommerce", auth, listEcommerce);
 
 router.get("/orders/:orderId", auth, getById);
 

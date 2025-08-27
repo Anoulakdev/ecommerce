@@ -224,7 +224,6 @@ model OrderDetail {
   productstatus   ProductStatus @relation(fields: [productstatusId], references: [id])
   comment         String?       @db.Text
   payimg          String?       @db.VarChar(255)
-  paydate         DateTime?     @db.Timestamptz(0)
   createdAt       DateTime      @default(now()) @db.Timestamptz(0)
 
   @@index([orderId])
