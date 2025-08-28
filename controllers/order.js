@@ -8,11 +8,30 @@ exports.create = async (req, res) => {
       return res.status(400).json({ message: "No items provided" });
     }
 
+    // 1. หา order ล่าสุดจาก DB (เอา orderNo ที่มากที่สุด)
+    const lastOrder = await prisma.order.findFirst({
+      orderBy: {
+        id: "desc", // ใช้ id ล่าสุด หรือถ้าอยากใช้ orderNo จริงๆ ต้อง sort ตาม orderNo
+      },
+      select: { orderNo: true },
+    });
+
+    // 2. ดึงเลขลำดับออกมา
+    let lastNumber = 0;
+    if (lastOrder && lastOrder.orderNo) {
+      // orderNo เป็น JPRL-0000000010 → ดึงเลขหลัง '-'
+      const match = lastOrder.orderNo.match(/JPRL-(\d+)/);
+      if (match) {
+        lastNumber = parseInt(match[1], 10);
+      }
+    }
+
+    // 3. สร้าง order ใหม่ตามจำนวน items
     const orders = await Promise.all(
       items.map((item, index) =>
         prisma.order.create({
           data: {
-            orderNo: "JPRL-" + String(index + 1).padStart(10, "0"),
+            orderNo: "JPRL-" + String(lastNumber + index + 1).padStart(10, "0"),
             productId: Number(item.productId),
             quantity: Number(item.quantity),
             price: Number(item.price),
