@@ -102,6 +102,12 @@ exports.list = async (req, res) => {
         reviews: {
           select: { rating: true },
         },
+        users: {
+          where: {
+            userCode: req.user.code, // ✅ match user ที่ login
+          },
+          select: { productId: true }, // ✅ match productId ของสินค้านั้นด้วย
+        },
       },
     });
 
@@ -115,6 +121,7 @@ exports.list = async (req, res) => {
       return {
         ...product,
         avgRating, // ✅ ค่าเฉลี่ย rating
+        favorite: product.users.length > 0,
         createdAt: moment(product.createdAt)
           .tz("Asia/Vientiane")
           .format("YYYY-MM-DD HH:mm:ss"),
