@@ -115,7 +115,7 @@ exports.list = async (req, res) => {
       const ratings = product.reviews.map((r) => r.rating).filter(Boolean);
       const avgRating =
         ratings.length > 0
-          ? (ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(2)
+          ? (ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(1)
           : null;
 
       return {
@@ -169,18 +169,38 @@ exports.getProduct = async (req, res) => {
             },
           },
         },
+        reviews: {
+          select: { rating: true }, // ✅ ดึง rating
+        },
+        users: {
+          where: {
+            userCode: req.user.code, // ✅ match user ที่ login
+          },
+          select: { productId: true },
+        },
       },
     });
 
-    const formatted = products.map((product) => ({
-      ...product,
-      createdAt: moment(product.createdAt)
-        .tz("Asia/Vientiane")
-        .format("YYYY-MM-DD HH:mm:ss"),
-      updatedAt: moment(product.updatedAt)
-        .tz("Asia/Vientiane")
-        .format("YYYY-MM-DD HH:mm:ss"),
-    }));
+    const formatted = products.map((product) => {
+      // ✅ คำนวณ avgRating
+      const ratings = product.reviews.map((r) => r.rating).filter(Boolean);
+      const avgRating =
+        ratings.length > 0
+          ? (ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(1)
+          : null;
+
+      return {
+        ...product,
+        avgRating,
+        favorite: product.users.length > 0, // ✅ เช็คว่า user login เคย favorite ไหม
+        createdAt: moment(product.createdAt)
+          .tz("Asia/Vientiane")
+          .format("YYYY-MM-DD HH:mm:ss"),
+        updatedAt: moment(product.updatedAt)
+          .tz("Asia/Vientiane")
+          .format("YYYY-MM-DD HH:mm:ss"),
+      };
+    });
 
     res.json(formatted);
   } catch (err) {
@@ -232,7 +252,7 @@ exports.getById = async (req, res) => {
     const ratings = product.reviews.map((r) => r.rating).filter(Boolean);
     const avgRating =
       ratings.length > 0
-        ? (ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(2)
+        ? (ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(1)
         : null;
 
     // ✅ นับจำนวนแต่ละ rating 1-5
