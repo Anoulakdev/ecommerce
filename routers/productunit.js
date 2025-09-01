@@ -12,14 +12,14 @@ const {
 // middleware
 const { auth, checkRole } = require("../middleware/auth");
 
-router.get("/productunits", list);
+router.get("/productunits", auth, list);
 
-router.get("/productunits/:pUnitId", getById);
+router.get("/productunits/:pUnitId", auth, getById);
 
-router.post("/productunits", create);
+router.post("/productunits", auth, create);
 
-router.put("/productunits/:pUnitId", update);
+router.put("/productunits/:pUnitId", auth, update);
 
-router.delete("/productunits/:pUnitId", remove);
+router.delete("/productunits/:pUnitId", auth, remove);
 
 module.exports = router;

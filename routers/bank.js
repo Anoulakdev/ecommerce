@@ -12,14 +12,14 @@ const {
 // middleware
 const { auth, checkRole } = require("../middleware/auth");
 
-router.get("/banks", list);
+router.get("/banks", auth, list);
 
-router.get("/banks/:bankId", getById);
+router.get("/banks/:bankId", auth, getById);
 
-router.post("/banks", create);
+router.post("/banks", auth, create);
 
-router.put("/banks/:bankId", update);
+router.put("/banks/:bankId", auth, update);
 
-router.delete("/banks/:bankId", remove);
+router.delete("/banks/:bankId", auth, remove);
 
 module.exports = router;
