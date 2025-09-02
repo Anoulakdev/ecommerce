@@ -65,24 +65,39 @@ exports.list = async (req, res) => {
           include: {
             category: true,
             productunit: true,
+            reviews: {
+              select: { rating: true }, // ดึง rating
+            },
           },
         },
       },
     });
 
-    const formatted = favorites.map((favorite) => ({
-      userCode: favorite.userCode,
-      productId: favorite.productId,
-      product: {
-        ...favorite.product,
-        createdAt: moment(favorite.product.createdAt)
-          .tz("Asia/Vientiane")
-          .format("YYYY-MM-DD HH:mm:ss"),
-        updatedAt: moment(favorite.product.updatedAt)
-          .tz("Asia/Vientiane")
-          .format("YYYY-MM-DD HH:mm:ss"),
-      },
-    }));
+    const formatted = favorites.map((favorite) => {
+      const ratings = favorite.product.reviews
+        .map((r) => r.rating)
+        .filter(Boolean);
+      const avgRating =
+        ratings.length > 0
+          ? (ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(1)
+          : null;
+
+      return {
+        userCode: favorite.userCode,
+        productId: favorite.productId,
+        favorite: true, // เพราะ favorites list
+        avgRating, // ✅ เพิ่ม avgRating
+        product: {
+          ...favorite.product,
+          createdAt: moment(favorite.product.createdAt)
+            .tz("Asia/Vientiane")
+            .format("YYYY-MM-DD HH:mm:ss"),
+          updatedAt: moment(favorite.product.updatedAt)
+            .tz("Asia/Vientiane")
+            .format("YYYY-MM-DD HH:mm:ss"),
+        },
+      };
+    });
 
     res.json(formatted);
   } catch (err) {
