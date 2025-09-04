@@ -334,30 +334,30 @@ exports.listSeller = async (req, res) => {
         id: "desc",
       },
       include: {
+        user: {
+          select: {
+            id: true,
+            firstname: true,
+            lastname: true,
+            code: true,
+            tel: true,
+            unit: {
+              select: {
+                name: true,
+              },
+            },
+            chu: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
         product: {
           select: {
             id: true,
             title: true,
             pimg: true,
-            user: {
-              select: {
-                id: true,
-                firstname: true,
-                lastname: true,
-                code: true,
-                tel: true,
-                unit: {
-                  select: {
-                    name: true,
-                  },
-                },
-                chu: {
-                  select: {
-                    name: true,
-                  },
-                },
-              },
-            },
           },
         },
         orderDetails: {
@@ -400,30 +400,30 @@ exports.sellerProcess = async (req, res) => {
         id: "desc",
       },
       include: {
+        user: {
+          select: {
+            id: true,
+            firstname: true,
+            lastname: true,
+            code: true,
+            tel: true,
+            unit: {
+              select: {
+                name: true,
+              },
+            },
+            chu: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
         product: {
           select: {
             id: true,
             title: true,
             pimg: true,
-            user: {
-              select: {
-                id: true,
-                firstname: true,
-                lastname: true,
-                code: true,
-                tel: true,
-                unit: {
-                  select: {
-                    name: true,
-                  },
-                },
-                chu: {
-                  select: {
-                    name: true,
-                  },
-                },
-              },
-            },
           },
         },
         orderDetails: {
