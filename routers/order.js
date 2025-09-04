@@ -8,6 +8,7 @@ const {
   listProcess,
   listFinish,
   listSeller,
+  sellerProcess,
   listEcommerce,
   getById,
   create,
@@ -16,22 +17,24 @@ const {
 // middleware
 const { auth, checkRole } = require("../middleware/auth");
 
-router.get("/orderlist", auth, listOrder);
+router.get("/orderlist", auth, checkRole([3]), listOrder);
 
-router.get("/ordercancle", auth, listCancel);
+router.get("/ordercancle", auth, checkRole([3]), listCancel);
 
-router.get("/orderprocess", auth, listProcess);
+router.get("/orderprocess", auth, checkRole([3]), listProcess);
 
-router.get("/orderfinish", auth, listFinish);
+router.get("/orderfinish", auth, checkRole([3]), listFinish);
 
-router.get("/orderseller", auth, listSeller);
+router.get("/orderseller", auth, checkRole([3]), listSeller);
 
-router.get("/orderecommerce", auth, listEcommerce);
+router.get("/sellerprocess", auth, checkRole([3]), sellerProcess);
 
-router.get("/orders/:orderId", auth, getById);
+router.get("/orderecommerce", auth, checkRole([4]), listEcommerce);
 
-router.post("/orders", auth, create);
+router.get("/orders/:orderId", auth, checkRole([3, 4]), getById);
 
-router.delete("/orders/:orderId", auth, remove);
+router.post("/orders", auth, checkRole([3]), create);
+
+router.delete("/orders/:orderId", auth, checkRole([3]), remove);
 
 module.exports = router;

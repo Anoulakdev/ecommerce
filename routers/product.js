@@ -13,16 +13,16 @@ const {
 // middleware
 const { auth, checkRole } = require("../middleware/auth");
 
-router.get("/products", auth, list);
+router.get("/products", auth, checkRole([3]), list);
 
 router.get("/products/getproduct", auth, getProduct);
 
-router.get("/products/:productId", auth, getById);
+router.get("/products/:productId", auth, checkRole([3]), getById);
 
-router.post("/products", auth, create);
+router.post("/products", auth, checkRole([3]), create);
 
-router.put("/products/:productId", auth, update);
+router.put("/products/:productId", auth, checkRole([3]), update);
 
-router.delete("/products/:productId", auth, remove);
+router.delete("/products/:productId", auth, checkRole([3]), remove);
 
 module.exports = router;

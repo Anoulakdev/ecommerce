@@ -14,12 +14,12 @@ const { auth, checkRole } = require("../middleware/auth");
 
 router.get("/categorys", auth, list);
 
-router.get("/categorys/:catId", auth, getById);
+router.get("/categorys/:catId", auth, checkRole([4]), getById);
 
-router.post("/categorys", auth, create);
+router.post("/categorys", auth, checkRole([4]), create);
 
-router.put("/categorys/:catId", auth, update);
+router.put("/categorys/:catId", auth, checkRole([4]), update);
 
-router.delete("/categorys/:catId", auth, remove);
+router.delete("/categorys/:catId", auth, checkRole([4]), remove);
 
 module.exports = router;

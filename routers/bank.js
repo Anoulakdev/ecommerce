@@ -16,10 +16,10 @@ router.get("/banks", auth, list);
 
 router.get("/banks/:bankId", auth, getById);
 
-router.post("/banks", auth, create);
+router.post("/banks", auth, checkRole([4]), create);
 
-router.put("/banks/:bankId", auth, update);
+router.put("/banks/:bankId", auth, checkRole([4]), update);
 
-router.delete("/banks/:bankId", auth, remove);
+router.delete("/banks/:bankId", auth, checkRole([4]), remove);
 
 module.exports = router;

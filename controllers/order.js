@@ -334,30 +334,30 @@ exports.listSeller = async (req, res) => {
         id: "desc",
       },
       include: {
-        user: {
-          select: {
-            id: true,
-            firstname: true,
-            lastname: true,
-            code: true,
-            tel: true,
-            unit: {
-              select: {
-                name: true,
-              },
-            },
-            chu: {
-              select: {
-                name: true,
-              },
-            },
-          },
-        },
         product: {
           select: {
             id: true,
             title: true,
             pimg: true,
+            user: {
+              select: {
+                id: true,
+                firstname: true,
+                lastname: true,
+                code: true,
+                tel: true,
+                unit: {
+                  select: {
+                    name: true,
+                  },
+                },
+                chu: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
           },
         },
         orderDetails: {
@@ -368,7 +368,79 @@ exports.listSeller = async (req, res) => {
       },
     });
 
-    const formatted = orders.map((order) => ({
+    // filter ฝั่งโค้ด
+    const filteredOrders = orders.filter(
+      (order) => order.orderDetails[0]?.productstatusId === 1
+    );
+
+    const formatted = filteredOrders.map((order) => ({
+      ...order,
+      createdAt: moment(order.createdAt)
+        .tz("Asia/Vientiane")
+        .format("YYYY-MM-DD HH:mm:ss"),
+      updatedAt: moment(order.updatedAt)
+        .tz("Asia/Vientiane")
+        .format("YYYY-MM-DD HH:mm:ss"),
+    }));
+
+    res.json(formatted);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
+exports.sellerProcess = async (req, res) => {
+  try {
+    const orders = await prisma.order.findMany({
+      where: {
+        product: { userCode: req.user.code },
+      },
+      orderBy: {
+        id: "desc",
+      },
+      include: {
+        product: {
+          select: {
+            id: true,
+            title: true,
+            pimg: true,
+            user: {
+              select: {
+                id: true,
+                firstname: true,
+                lastname: true,
+                code: true,
+                tel: true,
+                unit: {
+                  select: {
+                    name: true,
+                  },
+                },
+                chu: {
+                  select: {
+                    name: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+        orderDetails: {
+          orderBy: { id: "desc" }, // ล่าสุดก่อน
+          take: 1,
+          include: { productstatus: true },
+        },
+      },
+    });
+
+    // filter ฝั่งโค้ด
+    const excluded = [1];
+    const filteredOrders = orders.filter(
+      (order) => !excluded.includes(order.orderDetails[0]?.productstatusId)
+    );
+
+    const formatted = filteredOrders.map((order) => ({
       ...order,
       createdAt: moment(order.createdAt)
         .tz("Asia/Vientiane")
