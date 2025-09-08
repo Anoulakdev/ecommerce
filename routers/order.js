@@ -10,6 +10,7 @@ const {
   listSeller,
   sellerProcess,
   listEcommerce,
+  ecomSendMoney,
   getById,
   create,
   remove,
@@ -30,6 +31,8 @@ router.get("/orderseller", auth, checkRole([3]), listSeller);
 router.get("/sellerprocess", auth, checkRole([3]), sellerProcess);
 
 router.get("/orderecommerce", auth, checkRole([4]), listEcommerce);
+
+router.get("/ecomsendmoney", auth, checkRole([4]), ecomSendMoney);
 
 router.get("/orders/:orderId", auth, checkRole([3, 4]), getById);
 

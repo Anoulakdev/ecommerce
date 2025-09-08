@@ -463,7 +463,89 @@ exports.listEcommerce = async (req, res) => {
       where: {
         orderDetails: {
           some: {
-            productstatusId: 4,
+            productstatusId: {
+              gte: 4,
+              lte: 7,
+            },
+          },
+        },
+      },
+      orderBy: {
+        id: "desc",
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstname: true,
+            lastname: true,
+            code: true,
+            tel: true,
+            unit: {
+              select: {
+                name: true,
+              },
+            },
+            chu: {
+              select: {
+                name: true,
+              },
+            },
+          },
+        },
+        product: {
+          select: {
+            id: true,
+            title: true,
+            pimg: true,
+          },
+        },
+        orderDetails: {
+          where: {
+            productstatusId: {
+              gte: 4,
+              lte: 7,
+            },
+          },
+          orderBy: { id: "desc" }, // ล่าสุดก่อน
+          take: 1,
+          include: { productstatus: true },
+        },
+      },
+    });
+
+    const formatted = orders.map((order) => {
+      const totalPrice = Number(order.totalprice) || 0;
+      const discount = totalPrice * 0.05; // 5%
+      const finalPrice = totalPrice - discount;
+
+      return {
+        ...order,
+        discount: discount.toFixed(2),
+        finalPrice: finalPrice.toFixed(2),
+        createdAt: moment(order.createdAt)
+          .tz("Asia/Vientiane")
+          .format("YYYY-MM-DD HH:mm:ss"),
+        updatedAt: moment(order.updatedAt)
+          .tz("Asia/Vientiane")
+          .format("YYYY-MM-DD HH:mm:ss"),
+      };
+    });
+
+    res.json(formatted);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
+exports.ecomSendMoney = async (req, res) => {
+  try {
+    const orders = await prisma.order.findMany({
+      where: {
+        orderDetails: {
+          some: {
+            productstatusId: 8,
           },
         },
       },
@@ -505,15 +587,23 @@ exports.listEcommerce = async (req, res) => {
       },
     });
 
-    const formatted = orders.map((order) => ({
-      ...order,
-      createdAt: moment(order.createdAt)
-        .tz("Asia/Vientiane")
-        .format("YYYY-MM-DD HH:mm:ss"),
-      updatedAt: moment(order.updatedAt)
-        .tz("Asia/Vientiane")
-        .format("YYYY-MM-DD HH:mm:ss"),
-    }));
+    const formatted = orders.map((order) => {
+      const totalPrice = Number(order.totalprice) || 0;
+      const discount = totalPrice * 0.05; // 5%
+      const finalPrice = totalPrice - discount;
+
+      return {
+        ...order,
+        discount: discount.toFixed(2),
+        finalPrice: finalPrice.toFixed(2),
+        createdAt: moment(order.createdAt)
+          .tz("Asia/Vientiane")
+          .format("YYYY-MM-DD HH:mm:ss"),
+        updatedAt: moment(order.updatedAt)
+          .tz("Asia/Vientiane")
+          .format("YYYY-MM-DD HH:mm:ss"),
+      };
+    });
 
     res.json(formatted);
   } catch (err) {
@@ -531,6 +621,13 @@ exports.getById = async (req, res) => {
         id: Number(orderId),
       },
       include: {
+        product: {
+          select: {
+            id: true,
+            title: true,
+            pimg: true,
+          },
+        },
         orderDetails: {
           orderBy: { id: "desc" }, // ล่าสุดก่อน
           include: {

@@ -14,12 +14,12 @@ const { auth, checkRole } = require("../middleware/auth");
 
 router.get("/productstatus", auth, list);
 
-router.get("/productstatus/:pStatusId", auth, checkRole([4]), getById);
+router.get("/productstatus/:pStatusId", auth, getById);
 
-router.post("/productstatus", auth, checkRole([4]), create);
+router.post("/productstatus", auth, create);
 
-router.put("/productstatus/:pStatusId", auth, checkRole([4]), update);
+router.put("/productstatus/:pStatusId", auth, update);
 
-router.delete("/productstatus/:pStatusId", auth, checkRole([4]), remove);
+router.delete("/productstatus/:pStatusId", auth, remove);
 
 module.exports = router;
