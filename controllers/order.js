@@ -263,6 +263,11 @@ exports.listFinish = async (req, res) => {
     const orders = await prisma.order.findMany({
       where: {
         userCode: req.user.code,
+        orderDetails: {
+          some: {
+            productstatusId: 7,
+          },
+        },
       },
       orderBy: {
         id: "desc",
@@ -294,20 +299,25 @@ exports.listFinish = async (req, res) => {
             },
           },
         },
-        orderDetails: {
-          orderBy: { id: "desc" }, // ล่าสุดก่อน
-          take: 1,
-          include: { productstatus: true },
-        },
+        // orderDetails: {
+        //   orderBy: { id: "desc" }, // ล่าสุดก่อน
+        //   take: 1,
+        //   include: { productstatus: true },
+        // },
       },
     });
 
-    // filter ฝั่งโค้ด
-    const filteredOrders = orders.filter(
-      (order) => order.orderDetails[0]?.productstatusId === 7
-    );
+    // กรองเฉพาะ order แรกของแต่ละ productId
+    const uniqueOrdersMap = new Map();
+    orders.forEach((order) => {
+      if (!uniqueOrdersMap.has(order.productId)) {
+        uniqueOrdersMap.set(order.productId, order);
+      }
+    });
+    const uniqueOrders = Array.from(uniqueOrdersMap.values());
 
-    const formatted = filteredOrders.map((order) => ({
+    // แปลง format วันที่
+    const formatted = uniqueOrders.map((order) => ({
       ...order,
       createdAt: moment(order.createdAt)
         .tz("Asia/Vientiane")
@@ -459,20 +469,9 @@ exports.sellerProcess = async (req, res) => {
 
 exports.listEcommerce = async (req, res) => {
   try {
+    // ดึง order พร้อม orderDetails ล่าสุดเท่านั้น
     const orders = await prisma.order.findMany({
-      where: {
-        orderDetails: {
-          some: {
-            productstatusId: {
-              gte: 4,
-              lte: 7,
-            },
-          },
-        },
-      },
-      orderBy: {
-        id: "desc",
-      },
+      orderBy: { id: "desc" },
       include: {
         user: {
           select: {
@@ -481,16 +480,8 @@ exports.listEcommerce = async (req, res) => {
             lastname: true,
             code: true,
             tel: true,
-            unit: {
-              select: {
-                name: true,
-              },
-            },
-            chu: {
-              select: {
-                name: true,
-              },
-            },
+            unit: { select: { name: true } },
+            chu: { select: { name: true } },
           },
         },
         product: {
@@ -501,20 +492,22 @@ exports.listEcommerce = async (req, res) => {
           },
         },
         orderDetails: {
-          where: {
-            productstatusId: {
-              gte: 4,
-              lte: 7,
-            },
-          },
           orderBy: { id: "desc" }, // ล่าสุดก่อน
-          take: 1,
+          take: 1, // เอาเฉพาะล่าสุด
           include: { productstatus: true },
         },
       },
     });
 
-    const formatted = orders.map((order) => {
+    // filter order ที่ productstatusId ล่าสุดอยู่ใน 4-7
+    const filtered = orders.filter(
+      (order) =>
+        order.orderDetails.length > 0 &&
+        [4, 5, 6, 7].includes(order.orderDetails[0].productstatusId)
+    );
+
+    // map format
+    const formatted = filtered.map((order) => {
       const totalPrice = Number(order.totalprice) || 0;
       const discount = totalPrice * 0.05; // 5%
       const finalPrice = totalPrice - discount;
