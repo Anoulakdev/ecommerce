@@ -36,22 +36,30 @@ exports.create = (req, res) => {
 
     try {
       // Destructure body values
-      const { categoryId, productunitId, title, detail, price } = req.body;
+      const { productunitId, title, detail, price } = req.body;
 
       // Step 1: Validate input fields
-      if (!categoryId) {
+      if (!title) {
         return res.status(400).json({ message: "Missing required fields" });
       }
+
+      const shop = await prisma.user.findUnique({
+        where: { code: req.user.code },
+        include: {
+          shop: {
+            select: { id: true },
+          },
+        },
+      });
 
       // Step 4: Create new user
       const products = await prisma.product.create({
         data: {
-          categoryId: Number(categoryId),
+          shopId: shop.shop.id,
           productunitId: Number(productunitId),
           title,
           detail,
           price: Number(price),
-          userCode: req.user.code,
           pimg: req.file ? `${req.file.filename}` : null,
         },
       });
@@ -74,6 +82,7 @@ exports.list = async (req, res) => {
         categoryId: req.query.categoryId
           ? Number(req.query.categoryId)
           : undefined,
+        approved: 2,
       },
       orderBy: {
         id: "desc",
@@ -81,22 +90,11 @@ exports.list = async (req, res) => {
       include: {
         category: true,
         productunit: true,
-        user: {
+        shop: {
           select: {
             id: true,
-            firstname: true,
-            lastname: true,
-            code: true,
-            unit: {
-              select: {
-                name: true,
-              },
-            },
-            chu: {
-              select: {
-                name: true,
-              },
-            },
+            name: true,
+            tel: true,
           },
         },
         reviews: {
@@ -138,11 +136,73 @@ exports.list = async (req, res) => {
   }
 };
 
-exports.getProduct = async (req, res) => {
+exports.listUser = async (req, res) => {
   try {
     const products = await prisma.product.findMany({
       where: {
-        userCode: req.query.userCode,
+        shop: {
+          user: {
+            code: req.user.code, // ✅ filter user ผ่าน relation ของ shop
+          },
+        },
+      },
+      orderBy: {
+        id: "desc",
+      },
+      include: {
+        productunit: true,
+        shop: {
+          select: {
+            id: true,
+            name: true,
+            tel: true,
+          },
+        },
+        userAction: {
+          select: {
+            id: true,
+            firstname: true,
+            lastname: true,
+            gender: true,
+          },
+        },
+      },
+    });
+
+    const formatteds = products.map((product) => ({
+      ...product,
+      createdAt: moment(product.createdAt)
+        .tz("Asia/Vientiane")
+        .format("YYYY-MM-DD HH:mm:ss"),
+      updatedAt: moment(product.updatedAt)
+        .tz("Asia/Vientiane")
+        .format("YYYY-MM-DD HH:mm:ss"),
+    }));
+
+    res.json(formatteds);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
+exports.getProduct = async (req, res) => {
+  const { productId } = req.params;
+
+  const shop = await prisma.product.findUnique({
+    where: { id: Number(productId) },
+    include: {
+      shop: {
+        select: { id: true },
+      },
+    },
+  });
+
+  try {
+    const products = await prisma.product.findMany({
+      where: {
+        shopId: shop.shop.id,
+        approved: 2,
       },
       orderBy: {
         id: "asc",
@@ -150,23 +210,11 @@ exports.getProduct = async (req, res) => {
       include: {
         category: true,
         productunit: true,
-        user: {
+        shop: {
           select: {
             id: true,
-            firstname: true,
-            lastname: true,
-            code: true,
+            name: true,
             tel: true,
-            unit: {
-              select: {
-                name: true,
-              },
-            },
-            chu: {
-              select: {
-                name: true,
-              },
-            },
           },
         },
         reviews: {
@@ -220,22 +268,11 @@ exports.getById = async (req, res) => {
       include: {
         category: true,
         productunit: true,
-        user: {
+        shop: {
           select: {
             id: true,
-            firstname: true,
-            lastname: true,
-            code: true,
-            unit: {
-              select: {
-                name: true,
-              },
-            },
-            chu: {
-              select: {
-                name: true,
-              },
-            },
+            name: true,
+            tel: true,
           },
         },
         reviews: {
@@ -301,7 +338,7 @@ exports.update = async (req, res) => {
 
     try {
       const { productId } = req.params;
-      const { categoryId, productunitId, title, detail, price } = req.body;
+      const { productunitId, title, detail, price } = req.body;
 
       // Step 1: Find the user to update
       const products = await prisma.product.findUnique({
@@ -341,12 +378,10 @@ exports.update = async (req, res) => {
           id: Number(productId),
         },
         data: {
-          categoryId: Number(categoryId),
           productunitId: Number(productunitId),
           title,
           detail,
           price: Number(price),
-          userCode: req.user.code,
           pimg: productfilePath,
         },
       });
@@ -399,6 +434,84 @@ exports.remove = async (req, res) => {
     res
       .status(200)
       .json({ message: "product and image deleted successfully!" });
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
+exports.listapproved = async (req, res) => {
+  try {
+    const products = await prisma.product.findMany({
+      orderBy: {
+        id: "desc",
+      },
+      include: {
+        productunit: true,
+        shop: {
+          select: {
+            id: true,
+            name: true,
+            tel: true,
+          },
+        },
+        userAction: {
+          select: {
+            id: true,
+            firstname: true,
+            lastname: true,
+            gender: true,
+          },
+        },
+      },
+    });
+
+    const formatteds = products.map((product) => ({
+      ...product,
+      createdAt: moment(product.createdAt)
+        .tz("Asia/Vientiane")
+        .format("YYYY-MM-DD HH:mm:ss"),
+      updatedAt: moment(product.updatedAt)
+        .tz("Asia/Vientiane")
+        .format("YYYY-MM-DD HH:mm:ss"),
+    }));
+
+    res.json(formatteds);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
+exports.actionapproved = async (req, res) => {
+  try {
+    const { productId } = req.params;
+    const { categoryId, percent, approved } = req.body;
+
+    // Step 1: Find the user to update
+    const product = await prisma.product.findUnique({
+      where: {
+        id: Number(productId),
+      },
+    });
+
+    if (!product) {
+      return res.status(404).json({ message: "product not found" });
+    }
+
+    const updated = await prisma.product.update({
+      where: {
+        id: Number(productId),
+      },
+      data: {
+        categoryId: Number(categoryId),
+        percent: Number(percent),
+        approved: Number(approved),
+        userActionId: req.user.id,
+      },
+    });
+
+    res.json({ message: "Update successful!", data: updated });
   } catch (err) {
     console.log(err);
     res.status(500).json({ message: "Server Error" });

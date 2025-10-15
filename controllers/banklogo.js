@@ -16,7 +16,7 @@ const storage = multer.diskStorage({
   },
 });
 
-const upload = multer({ storage: storage }).single("bankqr");
+const upload = multer({ storage: storage }).single("bankimg");
 
 exports.create = (req, res) => {
   upload(req, res, async function (err) {
@@ -36,46 +36,24 @@ exports.create = (req, res) => {
 
     try {
       // Destructure body values
-      const { banklogoId, accountNo, accountName } = req.body;
+      const { name } = req.body;
 
       // Step 1: Validate input fields
-      if (!banklogoId) {
-        if (req.file) {
-          fs.unlinkSync(req.file.path);
-        }
+      if (!name) {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
-      const shop = await prisma.user.findUnique({
-        where: { code: req.user.code },
-        include: {
-          shop: {
-            select: { id: true },
-          },
-        },
-      });
-
-      if (!shop.shop) {
-        if (req.file) {
-          fs.unlinkSync(req.file.path);
-        }
-        return res.status(404).json({ message: "Shop not found for user" });
-      }
-
       // Step 4: Create new user
-      const banks = await prisma.bank.create({
+      const banklogos = await prisma.bankLogo.create({
         data: {
-          shopId: shop.shop.id,
-          banklogoId: Number(banklogoId),
-          accountNo,
-          accountName,
-          bankqr: req.file ? `${req.file.filename}` : null,
+          name,
+          bankimg: req.file ? `${req.file.filename}` : null,
         },
       });
 
       res.status(201).json({
-        message: "bank created successfully!",
-        data: banks,
+        message: "banklogo created successfully!",
+        data: banklogos,
       });
     } catch (err) {
       console.error("Server error:", err);
@@ -86,20 +64,13 @@ exports.create = (req, res) => {
 
 exports.list = async (req, res) => {
   try {
-    const banks = await prisma.bank.findMany({
-      where: {
-        shop: {
-          user: {
-            code: req.user.code,
-          },
-        },
-      },
-      include: {
-        banklogo: true,
+    const banklogos = await prisma.bankLogo.findMany({
+      orderBy: {
+        id: "asc",
       },
     });
 
-    res.json(banks);
+    res.json(banklogos);
   } catch (err) {
     console.log(err);
     res.status(500).json({ message: "Server Error" });
@@ -110,20 +81,17 @@ exports.getById = async (req, res) => {
   try {
     const { bankId } = req.params;
 
-    const bank = await prisma.bank.findUnique({
+    const banklogo = await prisma.bankLogo.findUnique({
       where: {
         id: Number(bankId),
       },
-      include: {
-        banklogo: true,
-      },
     });
 
-    if (!bank) {
+    if (!banklogo) {
       return res.status(404).json({ message: "banks not found" });
     }
 
-    res.json(bank);
+    res.json(banklogo);
   } catch (err) {
     // err
     console.log(err);
@@ -147,28 +115,28 @@ exports.update = async (req, res) => {
 
     try {
       const { bankId } = req.params;
-      const { banklogoId, accountNo, accountName } = req.body;
+      const { name } = req.body;
 
       // Step 1: Find the user to update
-      const banks = await prisma.bank.findUnique({
+      const banklogos = await prisma.bankLogo.findUnique({
         where: {
           id: Number(bankId),
         },
       });
 
-      if (!banks) {
-        return res.status(404).json({ message: "banks not found" });
+      if (!banklogos) {
+        return res.status(404).json({ message: "banklogos not found" });
       }
 
       // Step 2: If a new photo is uploaded and an old photo exists, delete the old photo
-      let bankfilePath = banks.bankqr; // Keep old photo path
+      let bankfilePath = banklogos.bankimg; // Keep old photo path
       if (req.file) {
         // Only attempt to delete if there is an existing photo path
-        if (banks.bankqr) {
+        if (banklogos.bankimg) {
           const oldBankFilePath = path.join(
             process.env.UPLOAD_BASE_PATH,
             "bank",
-            path.basename(banks.bankqr)
+            path.basename(banklogos.bankimg)
           );
           fs.unlink(oldBankFilePath, (err) => {
             if (err) {
@@ -182,15 +150,13 @@ exports.update = async (req, res) => {
       }
 
       // Step 3: Update the user record
-      const updated = await prisma.bank.update({
+      const updated = await prisma.bankLogo.update({
         where: {
           id: Number(bankId),
         },
         data: {
-          banklogoId: Number(banklogoId),
-          accountNo,
-          accountName,
-          bankqr: bankfilePath,
+          name,
+          bankimg: bankfilePath,
         },
       });
 
@@ -207,22 +173,22 @@ exports.remove = async (req, res) => {
     const { bankId } = req.params;
 
     // Step 1: Find the user by ID
-    const banks = await prisma.bank.findUnique({
+    const banklogos = await prisma.bankLogo.findUnique({
       where: {
         id: Number(bankId),
       },
     });
 
-    if (!banks) {
-      return res.status(404).json({ message: "banks not found" });
+    if (!banklogos) {
+      return res.status(404).json({ message: "banklogos not found" });
     }
 
     // Step 2: Delete the photo file if it exists
-    if (banks.bankqr) {
+    if (banklogos.bankimg) {
       const bankfilePath = path.join(
         process.env.UPLOAD_BASE_PATH,
         "bank",
-        banks.bankqr
+        banklogos.bankimg
       );
       fs.unlink(bankfilePath, (err) => {
         if (err) {
@@ -235,13 +201,15 @@ exports.remove = async (req, res) => {
     }
 
     // Step 3: Delete the user from the database
-    const removed = await prisma.bank.delete({
+    const removed = await prisma.bankLogo.delete({
       where: {
         id: Number(bankId),
       },
     });
 
-    res.status(200).json({ message: "bank and bankqr deleted successfully!" });
+    res
+      .status(200)
+      .json({ message: "banklogo and image deleted successfully!" });
   } catch (err) {
     console.log(err);
     res.status(500).json({ message: "Server Error" });

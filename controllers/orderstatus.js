@@ -39,24 +39,33 @@ exports.create = (req, res) => {
       const { orderId, productstatusId, comment } = req.body;
 
       // Step 1: Validate input fields
-      if (!orderId) {
+      if (!orderId || !productstatusId) {
         return res.status(400).json({ message: "Missing required fields" });
       }
 
-      // Step 4: Create new user
-      const orderdetails = await prisma.orderDetail.create({
-        data: {
-          orderId: Number(orderId),
-          productstatusId: Number(productstatusId),
-          payimg: req.file ? `${req.file.filename}` : null,
-          comment,
-          userCode: req.user.code,
-        },
+      // ทำ Transaction
+      const result = await prisma.$transaction(async (tx) => {
+        const orderStatus = await tx.orderStatus.create({
+          data: {
+            orderId: Number(orderId),
+            productstatusId: Number(productstatusId),
+            payimg: req.file ? req.file.filename : null,
+            comment,
+            userCode: req.user.code,
+          },
+        });
+
+        await tx.order.update({
+          where: { id: Number(orderId) },
+          data: { currentStatusId: Number(productstatusId) },
+        });
+
+        return orderStatus;
       });
 
       res.status(201).json({
-        message: "OrderStatus created successfully!",
-        data: orderdetails,
+        message: "OrderStatus created successfully",
+        data: result,
       });
     } catch (err) {
       console.error("Server error:", err);

@@ -8,50 +8,97 @@ exports.create = async (req, res) => {
       return res.status(400).json({ message: "No items provided" });
     }
 
-    // 1. หา order ล่าสุดจาก DB (เอา orderNo ที่มากที่สุด)
+    // ✅ 1. ดึงข้อมูล product ทั้งหมดที่มีใน body เพื่อตรวจสอบ shopId
+    const productIds = items.map((item) => item.productId);
+    const products = await prisma.product.findMany({
+      where: { id: { in: productIds } },
+      select: { id: true, shopId: true },
+    });
+
+    if (products.length === 0) {
+      return res.status(400).json({ message: "No valid products found" });
+    }
+
+    // ✅ 2. สร้าง map เพื่อเชื่อม productId → shopId
+    const productShopMap = {};
+    for (const p of products) {
+      productShopMap[p.id] = p.shopId;
+    }
+
+    // ✅ 3. Group สินค้าตาม shopId
+    const groupedByShop = {};
+    for (const item of items) {
+      const shopId = productShopMap[item.productId];
+      if (!groupedByShop[shopId]) groupedByShop[shopId] = [];
+      groupedByShop[shopId].push(item);
+    }
+
+    // ✅ 4. หาค่า order ล่าสุด
     const lastOrder = await prisma.order.findFirst({
-      orderBy: {
-        id: "desc", // ใช้ id ล่าสุด หรือถ้าอยากใช้ orderNo จริงๆ ต้อง sort ตาม orderNo
-      },
+      orderBy: { id: "desc" },
       select: { orderNo: true },
     });
 
-    // 2. ดึงเลขลำดับออกมา
     let lastNumber = 0;
-    if (lastOrder && lastOrder.orderNo) {
-      // orderNo เป็น JPRL-0000000010 → ดึงเลขหลัง '-'
+    if (lastOrder?.orderNo) {
       const match = lastOrder.orderNo.match(/JPRL-(\d+)/);
       if (match) {
         lastNumber = parseInt(match[1], 10);
       }
     }
 
-    // 3. สร้าง order ใหม่ตามจำนวน items
-    const orders = await Promise.all(
-      items.map((item, index) =>
-        prisma.order.create({
-          data: {
-            orderNo: "JPRL-" + String(lastNumber + index + 1).padStart(10, "0"),
-            productId: Number(item.productId),
-            quantity: Number(item.quantity),
-            price: Number(item.price),
-            totalprice: Number(item.totalprice),
-            userCode: req.user.code,
-            orderDetails: {
-              create: {
-                userCode: req.user.code,
-                productstatusId: 1,
-              },
-            },
+    let orderCount = 0;
+    const createdOrders = [];
+
+    // ✅ 5. สร้าง order ตามแต่ละ shop
+    for (const [shopId, shopItems] of Object.entries(groupedByShop)) {
+      orderCount++;
+      const newOrderNo =
+        "JPRL-" + String(lastNumber + orderCount).padStart(10, "0");
+
+      // คำนวณ grandtotal ของ shop นี้
+      const grandTotal = shopItems.reduce(
+        (sum, item) => sum + Number(item.totalprice),
+        0
+      );
+
+      // ✅ สร้าง order พร้อม orderDetails หลายรายการ
+      const newOrder = await prisma.order.create({
+        data: {
+          orderNo: newOrderNo,
+          shopId: Number(shopId),
+          userCode: req.user.code,
+          grandtotalprice: grandTotal,
+          orderDetails: {
+            create: shopItems.map((item) => ({
+              productId: Number(item.productId),
+              quantity: Number(item.quantity),
+              price: Number(item.price),
+              totalprice: Number(item.totalprice),
+            })),
           },
-          include: { orderDetails: true },
-        })
-      )
-    );
+          orderStatuses: {
+            create: [
+              {
+                productstatusId: 1, // ✅ สถานะเริ่มต้น เช่น Pending
+                userCode: req.user.code,
+              },
+            ],
+          },
+        },
+        include: {
+          orderDetails: true,
+          orderStatuses: true,
+          shop: { select: { name: true } },
+        },
+      });
+
+      createdOrders.push(newOrder);
+    }
 
     res.json({
       message: "Orders created successfully!",
-      data: orders,
+      data: createdOrders,
     });
   } catch (err) {
     console.error("Server error:", err);
@@ -64,51 +111,25 @@ exports.listOrder = async (req, res) => {
     const orders = await prisma.order.findMany({
       where: {
         userCode: req.user.code,
+        currentStatusId: 1,
       },
       orderBy: {
         id: "desc",
       },
       include: {
-        product: {
+        shop: {
           select: {
             id: true,
-            title: true,
-            pimg: true,
-            user: {
-              select: {
-                id: true,
-                firstname: true,
-                lastname: true,
-                code: true,
-                tel: true,
-                unit: {
-                  select: {
-                    name: true,
-                  },
-                },
-                chu: {
-                  select: {
-                    name: true,
-                  },
-                },
-              },
-            },
+            name: true,
+            tel: true,
+            userCode: true,
           },
         },
-        orderDetails: {
-          orderBy: { id: "desc" }, // ล่าสุดก่อน
-          take: 1,
-          include: { productstatus: true },
-        },
+        currentStatus: true,
       },
     });
 
-    // filter ฝั่งโค้ด
-    const filteredOrders = orders.filter(
-      (order) => order.orderDetails[0]?.productstatusId === 1
-    );
-
-    const formatted = filteredOrders.map((order) => ({
+    const formatted = orders.map((order) => ({
       ...order,
       createdAt: moment(order.createdAt)
         .tz("Asia/Vientiane")
@@ -130,51 +151,25 @@ exports.listCancel = async (req, res) => {
     const orders = await prisma.order.findMany({
       where: {
         userCode: req.user.code,
+        currentStatusId: 2,
       },
       orderBy: {
         id: "desc",
       },
       include: {
-        product: {
+        shop: {
           select: {
             id: true,
-            title: true,
-            pimg: true,
-            user: {
-              select: {
-                id: true,
-                firstname: true,
-                lastname: true,
-                code: true,
-                tel: true,
-                unit: {
-                  select: {
-                    name: true,
-                  },
-                },
-                chu: {
-                  select: {
-                    name: true,
-                  },
-                },
-              },
-            },
+            name: true,
+            tel: true,
+            userCode: true,
           },
         },
-        orderDetails: {
-          orderBy: { id: "desc" }, // ล่าสุดก่อน
-          take: 1,
-          include: { productstatus: true },
-        },
+        currentStatus: true,
       },
     });
 
-    // filter ฝั่งโค้ด
-    const filteredOrders = orders.filter(
-      (order) => order.orderDetails[0]?.productstatusId === 2
-    );
-
-    const formatted = filteredOrders.map((order) => ({
+    const formatted = orders.map((order) => ({
       ...order,
       createdAt: moment(order.createdAt)
         .tz("Asia/Vientiane")
@@ -196,52 +191,29 @@ exports.listProcess = async (req, res) => {
     const orders = await prisma.order.findMany({
       where: {
         userCode: req.user.code,
+        NOT: {
+          currentStatusId: {
+            in: [1, 2], // ไม่เอา currentStatusId ที่เป็น 1 หรือ 2
+          },
+        },
       },
       orderBy: {
         id: "desc",
       },
       include: {
-        product: {
+        shop: {
           select: {
             id: true,
-            title: true,
-            pimg: true,
-            user: {
-              select: {
-                id: true,
-                firstname: true,
-                lastname: true,
-                code: true,
-                tel: true,
-                unit: {
-                  select: {
-                    name: true,
-                  },
-                },
-                chu: {
-                  select: {
-                    name: true,
-                  },
-                },
-              },
-            },
+            name: true,
+            tel: true,
+            userCode: true,
           },
         },
-        orderDetails: {
-          orderBy: { id: "desc" }, // ล่าสุดก่อน
-          take: 1,
-          include: { productstatus: true },
-        },
+        currentStatus: true,
       },
     });
 
-    // filter ฝั่งโค้ด
-    const excluded = [1, 2];
-    const filteredOrders = orders.filter(
-      (order) => !excluded.includes(order.orderDetails[0]?.productstatusId)
-    );
-
-    const formatted = filteredOrders.map((order) => ({
+    const formatted = orders.map((order) => ({
       ...order,
       createdAt: moment(order.createdAt)
         .tz("Asia/Vientiane")
@@ -260,76 +232,74 @@ exports.listProcess = async (req, res) => {
 
 exports.listFinish = async (req, res) => {
   try {
-    const orders = await prisma.order.findMany({
+    // 1️⃣ ดึงสินค้าทั้งหมดของ user ที่สั่งสำเร็จ (status = 7)
+    const products = await prisma.product.findMany({
       where: {
-        userCode: req.user.code,
         orderDetails: {
           some: {
-            productstatusId: 7,
+            order: {
+              userCode: req.user.code,
+              currentStatusId: 7,
+            },
           },
         },
       },
-      orderBy: {
-        id: "desc",
-      },
-      include: {
-        product: {
+      select: {
+        id: true,
+        title: true,
+        pimg: true,
+        shop: {
           select: {
             id: true,
-            title: true,
-            pimg: true,
-            user: {
+            name: true,
+            tel: true,
+            userCode: true,
+          },
+        },
+        orderDetails: {
+          select: {
+            order: {
               select: {
                 id: true,
-                firstname: true,
-                lastname: true,
-                code: true,
-                tel: true,
-                unit: {
-                  select: {
-                    name: true,
-                  },
-                },
-                chu: {
-                  select: {
-                    name: true,
-                  },
-                },
+                createdAt: true,
+                currentStatusId: true,
               },
             },
           },
         },
-        // orderDetails: {
-        //   orderBy: { id: "desc" }, // ล่าสุดก่อน
-        //   take: 1,
-        //   include: { productstatus: true },
-        // },
       },
     });
 
-    // กรองเฉพาะ order แรกของแต่ละ productId
-    const uniqueOrdersMap = new Map();
-    orders.forEach((order) => {
-      if (!uniqueOrdersMap.has(order.productId)) {
-        uniqueOrdersMap.set(order.productId, order);
-      }
-    });
-    const uniqueOrders = Array.from(uniqueOrdersMap.values());
+    // 2️⃣ รวม product ที่ id เหมือนกัน เหลืออันเดียว (เลือก order ล่าสุด)
+    const uniqueProductsMap = new Map();
 
-    // แปลง format วันที่
-    const formatted = uniqueOrders.map((order) => ({
-      ...order,
-      createdAt: moment(order.createdAt)
-        .tz("Asia/Vientiane")
-        .format("YYYY-MM-DD HH:mm:ss"),
-      updatedAt: moment(order.updatedAt)
-        .tz("Asia/Vientiane")
-        .format("YYYY-MM-DD HH:mm:ss"),
-    }));
+    for (const product of products) {
+      // หา order ล่าสุดของสินค้านั้น (ตาม createdAt หรือ id)
+      const latestOrder = product.orderDetails
+        .filter((d) => d.order?.currentStatusId === 7)
+        .sort(
+          (a, b) => new Date(b.order.createdAt) - new Date(a.order.createdAt)
+        )[0];
 
-    res.json(formatted);
+      uniqueProductsMap.set(product.id, {
+        ...product,
+        latestOrderId: latestOrder?.order.id || 0,
+        latestOrderDate:
+          moment(latestOrder?.order.createdAt)
+            .tz("Asia/Vientiane")
+            .format("YYYY-MM-DD HH:mm:ss") || null,
+      });
+    }
+
+    // 3️⃣ แปลง map เป็น array และเรียงตาม order ล่าสุด
+    const uniqueProducts = Array.from(uniqueProductsMap.values()).sort(
+      (a, b) => new Date(b.latestOrderDate) - new Date(a.latestOrderDate)
+    );
+
+    // 4️⃣ ส่งผลลัพธ์กลับ
+    res.json(uniqueProducts);
   } catch (err) {
-    console.log(err);
+    console.error(err);
     res.status(500).json({ message: "Server Error" });
   }
 };
@@ -338,7 +308,12 @@ exports.listSeller = async (req, res) => {
   try {
     const orders = await prisma.order.findMany({
       where: {
-        product: { userCode: req.user.code },
+        shop: {
+          user: {
+            code: req.user.code, // ✅ filter user ผ่าน relation ของ shop
+          },
+        },
+        currentStatusId: 1,
       },
       orderBy: {
         id: "desc",
@@ -349,41 +324,16 @@ exports.listSeller = async (req, res) => {
             id: true,
             firstname: true,
             lastname: true,
-            code: true,
+            gender: true,
             tel: true,
-            unit: {
-              select: {
-                name: true,
-              },
-            },
-            chu: {
-              select: {
-                name: true,
-              },
-            },
+            code: true,
           },
         },
-        product: {
-          select: {
-            id: true,
-            title: true,
-            pimg: true,
-          },
-        },
-        orderDetails: {
-          orderBy: { id: "desc" }, // ล่าสุดก่อน
-          take: 1,
-          include: { productstatus: true },
-        },
+        currentStatus: true,
       },
     });
 
-    // filter ฝั่งโค้ด
-    const filteredOrders = orders.filter(
-      (order) => order.orderDetails[0]?.productstatusId === 1
-    );
-
-    const formatted = filteredOrders.map((order) => ({
+    const formatted = orders.map((order) => ({
       ...order,
       createdAt: moment(order.createdAt)
         .tz("Asia/Vientiane")
@@ -404,7 +354,16 @@ exports.sellerProcess = async (req, res) => {
   try {
     const orders = await prisma.order.findMany({
       where: {
-        product: { userCode: req.user.code },
+        shop: {
+          user: {
+            code: req.user.code, // ✅ filter user ผ่าน relation ของ shop
+          },
+        },
+        NOT: {
+          currentStatusId: {
+            in: [1], // ไม่เอา currentStatusId ที่เป็น 1 หรือ 2
+          },
+        },
       },
       orderBy: {
         id: "desc",
@@ -415,42 +374,16 @@ exports.sellerProcess = async (req, res) => {
             id: true,
             firstname: true,
             lastname: true,
-            code: true,
+            gender: true,
             tel: true,
-            unit: {
-              select: {
-                name: true,
-              },
-            },
-            chu: {
-              select: {
-                name: true,
-              },
-            },
+            code: true,
           },
         },
-        product: {
-          select: {
-            id: true,
-            title: true,
-            pimg: true,
-          },
-        },
-        orderDetails: {
-          orderBy: { id: "desc" }, // ล่าสุดก่อน
-          take: 1,
-          include: { productstatus: true },
-        },
+        currentStatus: true,
       },
     });
 
-    // filter ฝั่งโค้ด
-    const excluded = [1];
-    const filteredOrders = orders.filter(
-      (order) => !excluded.includes(order.orderDetails[0]?.productstatusId)
-    );
-
-    const formatted = filteredOrders.map((order) => ({
+    const formatted = orders.map((order) => ({
       ...order,
       createdAt: moment(order.createdAt)
         .tz("Asia/Vientiane")
@@ -459,144 +392,6 @@ exports.sellerProcess = async (req, res) => {
         .tz("Asia/Vientiane")
         .format("YYYY-MM-DD HH:mm:ss"),
     }));
-
-    res.json(formatted);
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ message: "Server Error" });
-  }
-};
-
-exports.listEcommerce = async (req, res) => {
-  try {
-    // ดึง order พร้อม orderDetails ล่าสุดเท่านั้น
-    const orders = await prisma.order.findMany({
-      orderBy: { id: "desc" },
-      include: {
-        user: {
-          select: {
-            id: true,
-            firstname: true,
-            lastname: true,
-            code: true,
-            tel: true,
-            unit: { select: { name: true } },
-            chu: { select: { name: true } },
-          },
-        },
-        product: {
-          select: {
-            id: true,
-            title: true,
-            pimg: true,
-          },
-        },
-        orderDetails: {
-          orderBy: { id: "desc" }, // ล่าสุดก่อน
-          take: 1, // เอาเฉพาะล่าสุด
-          include: { productstatus: true },
-        },
-      },
-    });
-
-    // filter order ที่ productstatusId ล่าสุดอยู่ใน 4-7
-    const filtered = orders.filter(
-      (order) =>
-        order.orderDetails.length > 0 &&
-        [4, 5, 6, 7].includes(order.orderDetails[0].productstatusId)
-    );
-
-    // map format
-    const formatted = filtered.map((order) => {
-      const totalPrice = Number(order.totalprice) || 0;
-      const discount = totalPrice * 0.05; // 5%
-      const finalPrice = totalPrice - discount;
-
-      return {
-        ...order,
-        discount: discount.toFixed(2),
-        finalPrice: finalPrice.toFixed(2),
-        createdAt: moment(order.createdAt)
-          .tz("Asia/Vientiane")
-          .format("YYYY-MM-DD HH:mm:ss"),
-        updatedAt: moment(order.updatedAt)
-          .tz("Asia/Vientiane")
-          .format("YYYY-MM-DD HH:mm:ss"),
-      };
-    });
-
-    res.json(formatted);
-  } catch (err) {
-    console.log(err);
-    res.status(500).json({ message: "Server Error" });
-  }
-};
-
-exports.ecomSendMoney = async (req, res) => {
-  try {
-    const orders = await prisma.order.findMany({
-      where: {
-        orderDetails: {
-          some: {
-            productstatusId: 8,
-          },
-        },
-      },
-      orderBy: {
-        id: "desc",
-      },
-      include: {
-        user: {
-          select: {
-            id: true,
-            firstname: true,
-            lastname: true,
-            code: true,
-            tel: true,
-            unit: {
-              select: {
-                name: true,
-              },
-            },
-            chu: {
-              select: {
-                name: true,
-              },
-            },
-          },
-        },
-        product: {
-          select: {
-            id: true,
-            title: true,
-            pimg: true,
-          },
-        },
-        orderDetails: {
-          orderBy: { id: "desc" }, // ล่าสุดก่อน
-          take: 1,
-          include: { productstatus: true },
-        },
-      },
-    });
-
-    const formatted = orders.map((order) => {
-      const totalPrice = Number(order.totalprice) || 0;
-      const discount = totalPrice * 0.05; // 5%
-      const finalPrice = totalPrice - discount;
-
-      return {
-        ...order,
-        discount: discount.toFixed(2),
-        finalPrice: finalPrice.toFixed(2),
-        createdAt: moment(order.createdAt)
-          .tz("Asia/Vientiane")
-          .format("YYYY-MM-DD HH:mm:ss"),
-        updatedAt: moment(order.updatedAt)
-          .tz("Asia/Vientiane")
-          .format("YYYY-MM-DD HH:mm:ss"),
-      };
-    });
 
     res.json(formatted);
   } catch (err) {
@@ -614,25 +409,56 @@ exports.getById = async (req, res) => {
         id: Number(orderId),
       },
       include: {
-        product: {
+        currentStatus: {
           select: {
             id: true,
-            title: true,
-            pimg: true,
+            name: true,
+          },
+        },
+        shop: {
+          select: {
+            id: true,
+            name: true,
+            tel: true,
+            userCode: true,
           },
         },
         orderDetails: {
-          orderBy: { id: "desc" }, // ล่าสุดก่อน
-          include: {
-            productstatus: true,
+          select: {
+            product: {
+              select: {
+                id: true,
+                title: true,
+                pimg: true,
+              },
+            },
+            quantity: true,
+            price: true,
+            totalprice: true,
+          },
+        },
+        orderStatuses: {
+          select: {
+            productstatus: {
+              select: {
+                id: true,
+                name: true,
+              },
+            },
+            comment: true,
+            payimg: true,
             user: {
               select: {
                 id: true,
+                code: true,
                 firstname: true,
                 lastname: true,
                 gender: true,
+                tel: true,
+                code: true,
               },
             },
+            createdAt: true,
           },
         },
       },
@@ -650,16 +476,11 @@ exports.getById = async (req, res) => {
       updatedAt: moment(order.updatedAt)
         .tz("Asia/Vientiane")
         .format("YYYY-MM-DD HH:mm:ss"),
-      orderDetails: order.orderDetails.map((detail) => ({
-        ...detail,
-        createdAt: moment(detail.createdAt)
+      orderStatuses: order.orderStatuses.map((orderstatus) => ({
+        ...orderstatus,
+        createdAt: moment(orderstatus.createdAt)
           .tz("Asia/Vientiane")
           .format("YYYY-MM-DD HH:mm:ss"),
-        paydate: detail.paydate
-          ? moment(detail.paydate)
-              .tz("Asia/Vientiane")
-              .format("YYYY-MM-DD HH:mm:ss")
-          : null,
       })),
     };
 
@@ -676,6 +497,7 @@ exports.remove = async (req, res) => {
     const { orderId } = req.params;
 
     await prisma.$transaction([
+      prisma.orderStatus.deleteMany({ where: { orderId: Number(orderId) } }),
       prisma.orderDetail.deleteMany({ where: { orderId: Number(orderId) } }),
       prisma.order.delete({ where: { id: Number(orderId) } }),
     ]);
