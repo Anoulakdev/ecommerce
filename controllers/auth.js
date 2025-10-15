@@ -78,7 +78,7 @@ exports.login = async (req, res) => {
 
     // Step 4 Create Token
     const accessToken = jwt.sign(payload, process.env.JWT_SECRET, {
-      expiresIn: userWithAll.roleId === 3 ? "30d" : "1h",
+      expiresIn: userWithAll.roleId === 3 ? "8h" : "1h",
     });
     res.status(200).json({
       user: payload,
