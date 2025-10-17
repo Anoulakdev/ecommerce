@@ -70,6 +70,23 @@ exports.list = async (req, res) => {
   }
 };
 
+exports.checkshop = async (req, res) => {
+  try {
+    const shop = await prisma.shop.findFirst({
+      where: {
+        userCode: req.user.code,
+      },
+    });
+
+    const openshop = shop && shop.approved === 2 ? true : false;
+
+    res.json({ openshop });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
 exports.getById = async (req, res) => {
   try {
     const { shopId } = req.params;

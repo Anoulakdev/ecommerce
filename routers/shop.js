@@ -10,6 +10,7 @@ const {
   remove,
   listapproved,
   actionapproved,
+  checkshop,
 } = require("../controllers/shop");
 // middleware
 const { auth, checkRole } = require("../middleware/auth");
@@ -17,6 +18,8 @@ const { auth, checkRole } = require("../middleware/auth");
 router.get("/shops", auth, checkRole([3]), list);
 
 router.get("/shops/listapproved", auth, checkRole([4]), listapproved);
+
+router.get("/shops/checkshop", auth, checkRole([3]), checkshop);
 
 router.get("/shops/:shopId", auth, checkRole([3]), getById);
 
