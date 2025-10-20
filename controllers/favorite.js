@@ -68,24 +68,6 @@ exports.list = async (req, res) => {
             reviews: {
               select: { rating: true }, // ดึง rating
             },
-            user: {
-              select: {
-                id: true,
-                firstname: true,
-                lastname: true,
-                code: true,
-                unit: {
-                  select: {
-                    name: true,
-                  },
-                },
-                chu: {
-                  select: {
-                    name: true,
-                  },
-                },
-              },
-            },
           },
         },
       },

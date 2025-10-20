@@ -8,29 +8,37 @@ exports.create = async (req, res) => {
       return res.status(400).json({ message: "No items provided" });
     }
 
-    // ✅ 1. ดึงข้อมูล product ทั้งหมดที่มีใน body เพื่อตรวจสอบ shopId
+    // ✅ 1. ดึงข้อมูล product ทั้งหมดที่มีใน body เพื่อตรวจสอบ shopId และ percent
     const productIds = items.map((item) => item.productId);
     const products = await prisma.product.findMany({
       where: { id: { in: productIds } },
-      select: { id: true, shopId: true },
+      select: { id: true, shopId: true, percent: true },
     });
 
     if (products.length === 0) {
       return res.status(400).json({ message: "No valid products found" });
     }
 
-    // ✅ 2. สร้าง map เพื่อเชื่อม productId → shopId
-    const productShopMap = {};
+    // ✅ 2. สร้าง map เพื่อเชื่อม productId → shopId และ percent
+    const productMap = {};
     for (const p of products) {
-      productShopMap[p.id] = p.shopId;
+      productMap[p.id] = {
+        shopId: p.shopId,
+        percent: p.percent ?? 0, // กันกรณี null
+      };
     }
 
     // ✅ 3. Group สินค้าตาม shopId
     const groupedByShop = {};
     for (const item of items) {
-      const shopId = productShopMap[item.productId];
+      const productInfo = productMap[item.productId];
+      if (!productInfo) continue; // ข้ามถ้า productId ไม่มีใน DB
+      const shopId = productInfo.shopId;
       if (!groupedByShop[shopId]) groupedByShop[shopId] = [];
-      groupedByShop[shopId].push(item);
+      groupedByShop[shopId].push({
+        ...item,
+        percent: productInfo.percent, // ✅ ดึง percent จาก product
+      });
     }
 
     // ✅ 4. หาค่า order ล่าสุด
@@ -56,7 +64,7 @@ exports.create = async (req, res) => {
       const newOrderNo =
         "JPRL-" + String(lastNumber + orderCount).padStart(10, "0");
 
-      // คำนวณ grandtotal ของ shop นี้
+      // ✅ คำนวณ grandtotal ของ shop นี้
       const grandTotal = shopItems.reduce(
         (sum, item) => sum + Number(item.totalprice),
         0
@@ -75,12 +83,13 @@ exports.create = async (req, res) => {
               quantity: Number(item.quantity),
               price: Number(item.price),
               totalprice: Number(item.totalprice),
+              percent: Number(item.percent) || 0, // ✅ มาจาก product.percent แล้ว
             })),
           },
           orderStatuses: {
             create: [
               {
-                productstatusId: 1, // ✅ สถานะเริ่มต้น เช่น Pending
+                productstatusId: 1, // สถานะเริ่มต้น เช่น Pending
                 userCode: req.user.code,
               },
             ],

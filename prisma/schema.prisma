@@ -244,6 +244,7 @@ model OrderDetail {
   quantity   Int?     @default(1)
   price      Decimal? @db.Decimal(10, 2)
   totalprice Decimal? @db.Decimal(10, 2)
+  percent    Int?     @db.SmallInt
 
   @@index([orderId])
 }
