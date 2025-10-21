@@ -63,6 +63,7 @@ exports.list = async (req, res) => {
       include: {
         product: {
           include: {
+            shop: true,
             category: true,
             productunit: true,
             reviews: {

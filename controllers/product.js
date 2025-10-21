@@ -77,12 +77,31 @@ exports.create = (req, res) => {
 
 exports.list = async (req, res) => {
   try {
+    const shop = await prisma.user.findUnique({
+      where: { code: req.user.code },
+      include: {
+        shop: {
+          select: { id: true },
+        },
+      },
+    });
+
+    // ✅ ตรวจว่าผู้ใช้มี shop หรือไม่
+    const shopId = shop?.shop?.id || null;
+
     const products = await prisma.product.findMany({
       where: {
         categoryId: req.query.categoryId
           ? Number(req.query.categoryId)
           : undefined,
         approved: 2,
+        ...(shopId
+          ? {
+              NOT: {
+                shopId: shopId,
+              },
+            }
+          : {}),
       },
       orderBy: {
         id: "desc",
