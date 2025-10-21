@@ -96,6 +96,22 @@ exports.getById = async (req, res) => {
         id: Number(shopId),
       },
       include: {
+        products: {
+          where: {
+            approved: 2,
+          },
+          include: {
+            reviews: {
+              select: { rating: true },
+            },
+            users: {
+              where: {
+                userCode: req.user.code, // ✅ match user ที่ login
+              },
+              select: { productId: true }, // ✅ match productId ของสินค้านั้นด้วย
+            },
+          },
+        },
         user: {
           select: {
             firstname: true,
@@ -110,8 +126,31 @@ exports.getById = async (req, res) => {
       return res.status(404).json({ message: "shop not found" });
     }
 
+    // ✅ format product data (avgRating, favorite, date)
+    const formattedProducts = shop.products.map((product) => {
+      const ratings = product.reviews.map((r) => r.rating).filter(Boolean);
+      const avgRating =
+        ratings.length > 0
+          ? (ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(1)
+          : null;
+
+      return {
+        ...product,
+        avgRating,
+        favorite: product.users.length > 0,
+        createdAt: moment(product.createdAt)
+          .tz("Asia/Vientiane")
+          .format("YYYY-MM-DD HH:mm:ss"),
+        updatedAt: moment(product.updatedAt)
+          .tz("Asia/Vientiane")
+          .format("YYYY-MM-DD HH:mm:ss"),
+      };
+    });
+
+    // ✅ รวมกลับเข้า shop object
     const formatted = {
       ...shop,
+      products: formattedProducts,
       createdAt: moment(shop.createdAt)
         .tz("Asia/Vientiane")
         .format("YYYY-MM-DD HH:mm:ss"),

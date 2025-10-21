@@ -206,18 +206,23 @@ exports.listUser = async (req, res) => {
 };
 
 exports.getProduct = async (req, res) => {
-  const { productId } = req.params;
-
-  const shop = await prisma.product.findUnique({
-    where: { id: Number(productId) },
-    include: {
-      shop: {
-        select: { id: true },
-      },
-    },
-  });
-
   try {
+    const { productId } = req.params;
+
+    const shop = await prisma.product.findUnique({
+      where: { id: Number(productId) },
+      include: {
+        shop: {
+          select: { id: true },
+        },
+      },
+    });
+
+    // ✅ ตรวจว่ามี product และ shop ไหม
+    if (!shop) {
+      return res.status(404).json({ message: "Product or Shop not found" });
+    }
+
     const products = await prisma.product.findMany({
       where: {
         shopId: shop.shop.id,
