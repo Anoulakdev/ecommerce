@@ -36,7 +36,7 @@ exports.create = (req, res) => {
 
     try {
       // Destructure body values
-      const { productunitId, title, detail, price } = req.body;
+      const { categoryId, productunitId, title, detail, price } = req.body;
 
       // Step 1: Validate input fields
       if (!title) {
@@ -56,6 +56,7 @@ exports.create = (req, res) => {
       const products = await prisma.product.create({
         data: {
           shopId: shop.shop.id,
+          categoryId: Number(categoryId),
           productunitId: Number(productunitId),
           title,
           detail,
@@ -169,6 +170,7 @@ exports.listUser = async (req, res) => {
         id: "desc",
       },
       include: {
+        category: true,
         productunit: true,
         shop: {
           select: {
@@ -362,7 +364,7 @@ exports.update = async (req, res) => {
 
     try {
       const { productId } = req.params;
-      const { productunitId, title, detail, price } = req.body;
+      const { categoryId, productunitId, title, detail, price } = req.body;
 
       // Step 1: Find the user to update
       const products = await prisma.product.findUnique({
@@ -402,6 +404,7 @@ exports.update = async (req, res) => {
           id: Number(productId),
         },
         data: {
+          categoryId: Number(categoryId),
           productunitId: Number(productunitId),
           title,
           detail,
