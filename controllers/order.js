@@ -517,3 +517,124 @@ exports.remove = async (req, res) => {
     res.status(500).json({ message: "Server Error" });
   }
 };
+
+exports.reportAllOrder = async (req, res) => {
+  try {
+    const { datestart, dateend } = req.query;
+    if (!datestart) {
+      return res.status(400).json({ message: "datestart is required" });
+    }
+    if (!dateend) {
+      return res.status(400).json({ message: "dateend is required" });
+    }
+
+    const startOfDate = new Date(`${datestart}T00:00:00+07:00`);
+    const endOfDate = new Date(`${dateend}T23:59:59+07:00`);
+
+    const orders = await prisma.orderDetail.findMany({
+      where: {
+        order: {
+          orderStatuses: {
+            some: {
+              productstatusId: 7,
+              createdAt: {
+                gte: startOfDate,
+                lte: endOfDate,
+              },
+            },
+          },
+        },
+      },
+      include: {
+        product: {
+          select: {
+            id: true,
+            title: true,
+            pimg: true,
+            shopId: true,
+            shop: {
+              select: {
+                id: true,
+                name: true,
+                tel: true,
+                user: {
+                  select: {
+                    id: true,
+                    firstname: true,
+                    lastname: true,
+                    gender: true,
+                  },
+                },
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // ✅ Group by shopId + productId + price + percent
+    const grouped = {};
+
+    for (const item of orders) {
+      if (!item.product || !item.product.shopId) continue;
+
+      const shopId = item.product.shopId;
+      const productId = item.product.id;
+      const price = Number(item.price ?? 0);
+      const percent = Number(item.percent ?? 0);
+      const key = `${productId}_${price}_${percent}`;
+
+      if (!grouped[shopId]) {
+        grouped[shopId] = {
+          shop: item.product.shop,
+          products: {},
+        };
+      }
+
+      if (!grouped[shopId].products[key]) {
+        const totalprice = Number(item.totalprice ?? 0);
+        const divide = totalprice * (percent / 100);
+
+        grouped[shopId].products[key] = {
+          productId,
+          title: item.product.title,
+          pimg: item.product.pimg,
+          price,
+          percent,
+          quantity: Number(item.quantity ?? 0),
+          totalprice,
+          divide,
+        };
+      } else {
+        const existing = grouped[shopId].products[key];
+        existing.quantity += Number(item.quantity ?? 0);
+        existing.totalprice += Number(item.totalprice ?? 0);
+        existing.divide += Number(item.totalprice ?? 0) * (percent / 100);
+      }
+    }
+
+    // ✅ รวมยอดแต่ละร้าน
+    const result = Object.values(grouped).map((shopGroup) => {
+      const products = Object.values(shopGroup.products);
+
+      const shopTotal = products.reduce(
+        (sum, p) => sum + Number(p.totalprice),
+        0
+      );
+
+      const shopDivide = products.reduce((sum, p) => sum + Number(p.divide), 0);
+
+      return {
+        shop: shopGroup.shop,
+        products,
+        shopTotal, // ยอดรวมก่อนหัก
+        shopDivide, // ส่วนแบ่งที่ต้องจ่าย
+      };
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error("🔥 Error listEcommerce:", err);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
