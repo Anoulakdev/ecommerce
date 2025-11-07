@@ -13,6 +13,7 @@ const {
   create,
   remove,
   reportAllOrder,
+  reportShopOrder,
 } = require("../controllers/order");
 // middleware
 const { auth, checkRole } = require("../middleware/auth");
@@ -30,6 +31,8 @@ router.get("/orderseller", auth, checkRole([3]), listSeller);
 router.get("/sellerprocess", auth, checkRole([3]), sellerProcess);
 
 router.get("/reportallorder", auth, checkRole([4]), reportAllOrder);
+
+router.get("/reportshoporder", auth, checkRole([3]), reportShopOrder);
 
 router.get("/orders/:orderId", auth, checkRole([3, 4]), getById);
 

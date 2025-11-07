@@ -563,6 +563,7 @@ exports.reportAllOrder = async (req, res) => {
                     firstname: true,
                     lastname: true,
                     gender: true,
+                    code: true,
                   },
                 },
               },
@@ -615,7 +616,9 @@ exports.reportAllOrder = async (req, res) => {
 
     // ✅ รวมยอดแต่ละร้าน
     const result = Object.values(grouped).map((shopGroup) => {
-      const products = Object.values(shopGroup.products);
+      const products = Object.values(shopGroup.products).sort(
+        (a, b) => a.productId - b.productId
+      );
 
       const shopTotal = products.reduce(
         (sum, p) => sum + Number(p.totalprice),
@@ -635,6 +638,104 @@ exports.reportAllOrder = async (req, res) => {
     res.json(result);
   } catch (err) {
     console.error("🔥 Error listEcommerce:", err);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
+exports.reportShopOrder = async (req, res) => {
+  try {
+    const { datestart, dateend } = req.query;
+    if (!datestart) {
+      return res.status(400).json({ message: "datestart is required" });
+    }
+    if (!dateend) {
+      return res.status(400).json({ message: "dateend is required" });
+    }
+
+    const startOfDate = new Date(`${datestart}T00:00:00+07:00`);
+    const endOfDate = new Date(`${dateend}T23:59:59+07:00`);
+
+    const shop = await prisma.user.findUnique({
+      where: { code: req.user.code },
+      include: {
+        shop: { select: { id: true } },
+      },
+    });
+
+    const shopId = shop?.shop?.id || null;
+
+    const orders = await prisma.orderDetail.findMany({
+      where: {
+        order: {
+          shopId: shopId,
+          orderStatuses: {
+            some: {
+              productstatusId: 7,
+              createdAt: {
+                gte: startOfDate,
+                lte: endOfDate,
+              },
+            },
+          },
+        },
+      },
+      include: {
+        product: {
+          select: {
+            id: true,
+            title: true,
+            pimg: true,
+          },
+        },
+      },
+    });
+
+    // ✅ Group by productId + price + percent
+    const grouped = {};
+
+    for (const item of orders) {
+      const productId = item.product.id;
+      const price = Number(item.price ?? 0);
+      const percent = Number(item.percent ?? 0);
+      const key = `${productId}_${price}_${percent}`;
+
+      if (!grouped[key]) {
+        const totalprice = Number(item.totalprice ?? 0);
+        const divide = totalprice * (percent / 100);
+        grouped[key] = {
+          productId,
+          title: item.product.title,
+          pimg: item.product.pimg,
+          price,
+          percent,
+          quantity: Number(item.quantity ?? 0),
+          totalprice,
+          divide,
+        };
+      } else {
+        const existing = grouped[key];
+        existing.quantity += Number(item.quantity ?? 0);
+        existing.totalprice += Number(item.totalprice ?? 0);
+        existing.divide += Number(item.totalprice ?? 0) * (percent / 100);
+      }
+    }
+
+    // ✅ แปลงเป็น array + sort ตาม productId ASC
+    const products = Object.values(grouped).sort(
+      (a, b) => a.productId - b.productId
+    );
+
+    // ✅ รวมยอดทั้งหมดของร้าน
+    const shopTotal = products.reduce((sum, p) => sum + p.totalprice, 0);
+    const shopDivide = products.reduce((sum, p) => sum + p.divide, 0);
+
+    res.json({
+      products,
+      shopTotal,
+      shopDivide,
+    });
+  } catch (err) {
+    console.error("🔥 Error reportShopOrder:", err);
     res.status(500).json({ message: "Server Error" });
   }
 };
