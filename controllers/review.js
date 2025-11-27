@@ -70,6 +70,83 @@ exports.list = async (req, res) => {
   }
 };
 
+exports.productReviews = async (req, res) => {
+  try {
+    const products = await prisma.product.findMany({
+      where: {
+        orderDetails: {
+          some: {
+            order: {
+              userCode: req.user.code,
+              currentStatusId: 7,
+            },
+          },
+        },
+      },
+      select: {
+        id: true,
+        title: true,
+        pimg: true,
+        shop: {
+          select: {
+            id: true,
+            name: true,
+            tel: true,
+            userCode: true,
+          },
+        },
+
+        // ⬇ ดึง order ล่าสุด 1 อันเท่านั้น
+        orderDetails: {
+          where: {
+            order: {
+              userCode: req.user.code,
+              currentStatusId: 7,
+            },
+          },
+          orderBy: {
+            order: {
+              createdAt: "desc",
+            },
+          },
+          take: 1, // เอาอันล่าสุดตัวเดียว
+          select: {
+            order: {
+              select: {
+                id: true,
+                createdAt: true,
+              },
+            },
+          },
+        },
+      },
+    });
+
+    // จัดรูปผลลัพธ์ ไม่ให้มี orderDetails
+    const result = products.map((p) => {
+      const latest = p.orderDetails[0]?.order;
+
+      return {
+        id: p.id,
+        title: p.title,
+        pimg: p.pimg,
+        shop: p.shop,
+        // latestOrderId: latest?.id || null,
+        // latestOrderDate: latest
+        //   ? moment(latest.createdAt)
+        //       .tz("Asia/Vientiane")
+        //       .format("YYYY-MM-DD HH:mm:ss")
+        //   : null,
+      };
+    });
+
+    res.json(result);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
 exports.getById = async (req, res) => {
   try {
     const { reviewId } = req.params;

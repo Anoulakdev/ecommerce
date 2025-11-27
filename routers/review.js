@@ -8,11 +8,14 @@ const {
   create,
   update,
   remove,
+  productReviews,
 } = require("../controllers/review");
 // middleware
 const { auth, checkRole } = require("../middleware/auth");
 
 router.get("/reviews", auth, checkRole([3]), list);
+
+router.get("/productreviews", auth, checkRole([3]), productReviews);
 
 router.get("/reviews/:reviewId", auth, checkRole([3]), getById);
 

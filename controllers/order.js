@@ -202,7 +202,7 @@ exports.listProcess = async (req, res) => {
         userCode: req.user.code,
         NOT: {
           currentStatusId: {
-            in: [1, 2], // ไม่เอา currentStatusId ที่เป็น 1 หรือ 2
+            in: [1, 2, 7], // ไม่เอา currentStatusId ที่เป็น 1 หรือ 2 หรือ 7
           },
         },
       },
@@ -241,22 +241,15 @@ exports.listProcess = async (req, res) => {
 
 exports.listFinish = async (req, res) => {
   try {
-    // 1️⃣ ดึงสินค้าทั้งหมดของ user ที่สั่งสำเร็จ (status = 7)
-    const products = await prisma.product.findMany({
+    const orders = await prisma.order.findMany({
       where: {
-        orderDetails: {
-          some: {
-            order: {
-              userCode: req.user.code,
-              currentStatusId: 7,
-            },
-          },
-        },
+        userCode: req.user.code,
+        currentStatusId: 7,
       },
-      select: {
-        id: true,
-        title: true,
-        pimg: true,
+      orderBy: {
+        id: "desc",
+      },
+      include: {
         shop: {
           select: {
             id: true,
@@ -265,48 +258,21 @@ exports.listFinish = async (req, res) => {
             userCode: true,
           },
         },
-        orderDetails: {
-          select: {
-            order: {
-              select: {
-                id: true,
-                createdAt: true,
-                currentStatusId: true,
-              },
-            },
-          },
-        },
+        currentStatus: true,
       },
     });
 
-    // 2️⃣ รวม product ที่ id เหมือนกัน เหลืออันเดียว (เลือก order ล่าสุด)
-    const uniqueProductsMap = new Map();
+    const formatted = orders.map((order) => ({
+      ...order,
+      createdAt: moment(order.createdAt)
+        .tz("Asia/Vientiane")
+        .format("YYYY-MM-DD HH:mm:ss"),
+      updatedAt: moment(order.updatedAt)
+        .tz("Asia/Vientiane")
+        .format("YYYY-MM-DD HH:mm:ss"),
+    }));
 
-    for (const product of products) {
-      // หา order ล่าสุดของสินค้านั้น (ตาม createdAt หรือ id)
-      const latestOrder = product.orderDetails
-        .filter((d) => d.order?.currentStatusId === 7)
-        .sort(
-          (a, b) => new Date(b.order.createdAt) - new Date(a.order.createdAt)
-        )[0];
-
-      uniqueProductsMap.set(product.id, {
-        ...product,
-        latestOrderId: latestOrder?.order.id || 0,
-        latestOrderDate:
-          moment(latestOrder?.order.createdAt)
-            .tz("Asia/Vientiane")
-            .format("YYYY-MM-DD HH:mm:ss") || null,
-      });
-    }
-
-    // 3️⃣ แปลง map เป็น array และเรียงตาม order ล่าสุด
-    const uniqueProducts = Array.from(uniqueProductsMap.values()).sort(
-      (a, b) => new Date(b.latestOrderDate) - new Date(a.latestOrderDate)
-    );
-
-    // 4️⃣ ส่งผลลัพธ์กลับ
-    res.json(uniqueProducts);
+    res.json(formatted);
   } catch (err) {
     console.error(err);
     res.status(500).json({ message: "Server Error" });
@@ -389,6 +355,11 @@ exports.sellerProcess = async (req, res) => {
           },
         },
         currentStatus: true,
+        orderStatuses: {
+          where: {
+            productstatusId: 4,
+          },
+        },
       },
     });
 
