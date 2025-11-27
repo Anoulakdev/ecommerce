@@ -62,6 +62,16 @@ exports.create = (req, res) => {
         return res.status(404).json({ message: "Shop not found for user" });
       }
 
+      const checkBank = await prisma.bank.findFirst({
+        where: { shopId: shop.shop.id, banklogoId: Number(banklogoId) },
+      });
+      if (checkBank) {
+        if (req.file) {
+          fs.unlinkSync(req.file.path);
+        }
+        return res.status(409).json({ message: "qr already exists" });
+      }
+
       // Step 4: Create new user
       const banks = await prisma.bank.create({
         data: {
