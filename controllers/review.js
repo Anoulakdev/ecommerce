@@ -10,6 +10,15 @@ exports.create = async (req, res) => {
       return res.status(400).json({ message: "Invalid input fields" });
     }
 
+    const checkReview = await prisma.review.findFirst({
+      where: { userCode: req.user.code, productId: Number(productId) },
+    });
+    if (checkReview) {
+      return res
+        .status(409)
+        .json({ message: "You have already reviewed this product" });
+    }
+
     // Create new user in the database
     const newReview = await prisma.review.create({
       data: {
@@ -37,6 +46,47 @@ exports.list = async (req, res) => {
     const reviews = await prisma.review.findMany({
       where: {
         productId: Number(productId),
+      },
+      orderBy: {
+        id: "desc",
+      },
+      include: {
+        user: {
+          select: {
+            id: true,
+            firstname: true,
+            lastname: true,
+            code: true,
+          },
+        },
+      },
+    });
+
+    const formatted = reviews.map((review) => ({
+      ...review,
+      createdAt: moment(review.createdAt)
+        .tz("Asia/Vientiane")
+        .format("YYYY-MM-DD HH:mm:ss"),
+      updatedAt: moment(review.updatedAt)
+        .tz("Asia/Vientiane")
+        .format("YYYY-MM-DD HH:mm:ss"),
+    }));
+
+    res.json(formatted);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
+exports.personReviews = async (req, res) => {
+  try {
+    const { productId } = req.query;
+
+    const reviews = await prisma.review.findMany({
+      where: {
+        productId: Number(productId),
+        userCode: req.user.code,
       },
       orderBy: {
         id: "desc",
