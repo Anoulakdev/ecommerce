@@ -263,7 +263,7 @@ exports.remove = async (req, res) => {
       },
     });
 
-    res.status(200).json({ message: "chu deleted successfully!" });
+    res.status(200).json({ message: "review deleted successfully!" });
   } catch (err) {
     console.log(err);
     res.status(500).json({ message: "Server Error" });
