@@ -116,6 +116,35 @@ exports.list = async (req, res) => {
   }
 };
 
+exports.bankOrder = async (req, res) => {
+  const { orderId } = req.params;
+
+  try {
+    const order = await prisma.order.findUnique({
+      where: {
+        id: Number(orderId),
+      },
+      select: {
+        shopId: true,
+      },
+    });
+
+    const banks = await prisma.bank.findMany({
+      where: {
+        shopId: order.shopId,
+      },
+      include: {
+        banklogo: true,
+      },
+    });
+
+    res.json(banks);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
 exports.getById = async (req, res) => {
   try {
     const { bankId } = req.params;
@@ -178,7 +207,7 @@ exports.update = async (req, res) => {
           const oldBankFilePath = path.join(
             process.env.UPLOAD_BASE_PATH,
             "bank",
-            path.basename(banks.bankqr)
+            path.basename(banks.bankqr),
           );
           fs.unlink(oldBankFilePath, (err) => {
             if (err) {
@@ -232,7 +261,7 @@ exports.remove = async (req, res) => {
       const bankfilePath = path.join(
         process.env.UPLOAD_BASE_PATH,
         "bank",
-        banks.bankqr
+        banks.bankqr,
       );
       fs.unlink(bankfilePath, (err) => {
         if (err) {

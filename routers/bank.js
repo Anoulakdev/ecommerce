@@ -8,11 +8,14 @@ const {
   create,
   update,
   remove,
+  bankOrder,
 } = require("../controllers/bank");
 // middleware
 const { auth, checkRole } = require("../middleware/auth");
 
 router.get("/banks", auth, checkRole([3]), list);
+
+router.get("/bankorder/:orderId", auth, checkRole([3]), bankOrder);
 
 router.get("/banks/:bankId", auth, checkRole([3]), getById);
 
