@@ -67,7 +67,7 @@ exports.list = async (req, res) => {
   try {
     const categorys = await prisma.category.findMany({
       orderBy: {
-        id: "asc",
+        code: "asc",
       },
     });
 
@@ -137,7 +137,7 @@ exports.update = async (req, res) => {
           const oldCategoryFilePath = path.join(
             process.env.UPLOAD_BASE_PATH,
             "category",
-            path.basename(categorys.catimg)
+            path.basename(categorys.catimg),
           );
           fs.unlink(oldCategoryFilePath, (err) => {
             if (err) {
@@ -190,7 +190,7 @@ exports.remove = async (req, res) => {
       const categoryfilePath = path.join(
         process.env.UPLOAD_BASE_PATH,
         "category",
-        categorys.catimg
+        categorys.catimg,
       );
       fs.unlink(categoryfilePath, (err) => {
         if (err) {
