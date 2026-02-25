@@ -1,5 +1,12 @@
 const prisma = require("../prisma/prisma");
 const moment = require("moment-timezone");
+const admin = require("firebase-admin");
+
+const serviceAccount = require("../config/firebase-service-account.json");
+
+admin.initializeApp({
+  credential: admin.credential.cert(serviceAccount),
+});
 
 exports.create = async (req, res) => {
   try {
@@ -59,51 +66,109 @@ exports.create = async (req, res) => {
     const createdOrders = [];
 
     // ✅ 5. สร้าง order ตามแต่ละ shop
-    for (const [shopId, shopItems] of Object.entries(groupedByShop)) {
-      orderCount++;
-      const newOrderNo =
-        "JPRL-" + String(lastNumber + orderCount).padStart(10, "0");
+    // 🔥 transaction
+    await prisma.$transaction(async (tx) => {
+      for (const [shopId, shopItems] of Object.entries(groupedByShop)) {
+        orderCount++;
 
-      // ✅ คำนวณ grandtotal ของ shop นี้
-      const grandTotal = shopItems.reduce(
-        (sum, item) => sum + Number(item.totalprice),
-        0
-      );
+        const newOrderNo =
+          "JPRL-" + String(lastNumber + orderCount).padStart(10, "0");
 
-      // ✅ สร้าง order พร้อม orderDetails หลายรายการ
-      const newOrder = await prisma.order.create({
-        data: {
-          orderNo: newOrderNo,
-          shopId: Number(shopId),
-          userCode: req.user.code,
-          grandtotalprice: grandTotal,
-          orderDetails: {
-            create: shopItems.map((item) => ({
-              productId: Number(item.productId),
-              quantity: Number(item.quantity),
-              price: Number(item.price),
-              totalprice: Number(item.totalprice),
-              percent: Number(item.percent) || 0, // ✅ มาจาก product.percent แล้ว
-            })),
+        const grandTotal = shopItems.reduce(
+          (sum, item) => sum + Number(item.totalprice),
+          0,
+        );
+
+        const newOrder = await tx.order.create({
+          data: {
+            orderNo: newOrderNo,
+            shopId: Number(shopId),
+            userCode: req.user.code,
+            grandtotalprice: grandTotal,
+            orderDetails: {
+              create: shopItems.map((item) => ({
+                productId: Number(item.productId),
+                quantity: Number(item.quantity),
+                price: Number(item.price),
+                totalprice: Number(item.totalprice),
+                percent: Number(item.percent) || 0,
+              })),
+            },
+            orderStatuses: {
+              create: [
+                {
+                  productstatusId: 1,
+                  userCode: req.user.code,
+                },
+              ],
+            },
           },
-          orderStatuses: {
-            create: [
-              {
-                productstatusId: 1, // สถานะเริ่มต้น เช่น Pending
-                userCode: req.user.code,
+          include: {
+            orderDetails: true,
+            shop: {
+              include: {
+                user: {
+                  include: {
+                    fcmTokens: true,
+                  },
+                },
               },
-            ],
+            },
           },
-        },
-        include: {
-          orderDetails: true,
-          orderStatuses: true,
-          shop: { select: { name: true } },
-        },
-      });
+        });
 
-      createdOrders.push(newOrder);
-    }
+        createdOrders.push(newOrder);
+
+        // ===============================
+        // 🔔 ส่ง Notification หาเจ้าของร้าน
+        // ===============================
+
+        const tokens =
+          newOrder.shop.user.fcmTokens
+            ?.map((t) => t.fcmtoken)
+            .filter(Boolean) || [];
+
+        if (tokens.length > 0) {
+          const message = {
+            notification: {
+              title: "ມີອໍເດີໃໝ່ເຂົ້າ",
+              body: `ມີອໍເດີໃໝ່ເລກທີ່ ${newOrder.orderNo} ຂອງ ${req.user.gender === "Male" ? "ທ່ານ" : "ທ່ານນາງ"} ${req.user.firstname} ${req.user.lastname}`,
+            },
+            data: {
+              orderId: String(newOrder.id),
+              type: "NEW_ORDER",
+            },
+            tokens,
+          };
+
+          const response = await admin
+            .messaging()
+            .sendEachForMulticast(message);
+
+          // 🔥 ลบ token ที่ invalid
+          if (response.failureCount > 0) {
+            const invalidTokens = [];
+
+            response.responses.forEach((resp, index) => {
+              if (!resp.success) {
+                invalidTokens.push(tokens[index]);
+              }
+            });
+
+            if (invalidTokens.length > 0) {
+              await tx.fcmToken.deleteMany({
+                where: { fcmToken: { in: invalidTokens } },
+              });
+            }
+          }
+
+          console.log(
+            `Notification sent to shop ${newOrder.shop.name}:`,
+            response.successCount,
+          );
+        }
+      }
+    });
 
     res.json({
       message: "Orders created successfully!",
@@ -588,12 +653,12 @@ exports.reportAllOrder = async (req, res) => {
     // ✅ รวมยอดแต่ละร้าน
     const result = Object.values(grouped).map((shopGroup) => {
       const products = Object.values(shopGroup.products).sort(
-        (a, b) => a.productId - b.productId
+        (a, b) => a.productId - b.productId,
       );
 
       const shopTotal = products.reduce(
         (sum, p) => sum + Number(p.totalprice),
-        0
+        0,
       );
 
       const shopDivide = products.reduce((sum, p) => sum + Number(p.divide), 0);
@@ -693,7 +758,7 @@ exports.reportShopOrder = async (req, res) => {
 
     // ✅ แปลงเป็น array + sort ตาม productId ASC
     const products = Object.values(grouped).sort(
-      (a, b) => a.productId - b.productId
+      (a, b) => a.productId - b.productId,
     );
 
     // ✅ รวมยอดทั้งหมดของร้าน

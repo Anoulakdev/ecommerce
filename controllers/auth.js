@@ -4,7 +4,7 @@ const jwt = require("jsonwebtoken");
 
 exports.login = async (req, res) => {
   try {
-    const { username, password } = req.body;
+    const { username, password, platform, model, fcmtoken } = req.body;
     if (!username) {
       return res
         .status(400)
@@ -37,6 +37,37 @@ exports.login = async (req, res) => {
       return res.status(400).json({
         message: "​ລະ​ຫັດ​ບໍ່​ຕົງ",
       });
+    }
+
+    // ===== OPTIONAL FCM SECTION =====
+    if (platform && model && fcmtoken) {
+      const checkfcm = await prisma.fcmToken.findFirst({
+        where: {
+          userId: user.id,
+          platform: platform,
+          model: model,
+        },
+      });
+
+      if (checkfcm) {
+        await prisma.fcmToken.update({
+          where: {
+            id: checkfcm.id,
+          },
+          data: {
+            fcmtoken: fcmtoken,
+          },
+        });
+      } else {
+        await prisma.fcmToken.create({
+          data: {
+            userId: user.id,
+            platform: platform,
+            model: model,
+            fcmtoken: fcmtoken,
+          },
+        });
+      }
     }
 
     const userWithAll = await prisma.user.findUnique({

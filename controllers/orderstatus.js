@@ -36,7 +36,7 @@ exports.create = (req, res) => {
 
     try {
       // Destructure body values
-      const { orderId, productstatusId, comment } = req.body;
+      const { orderId, productstatusId, comment, sendlocationId } = req.body;
 
       // Step 1: Validate input fields
       if (!orderId || !productstatusId) {
@@ -51,6 +51,7 @@ exports.create = (req, res) => {
             productstatusId: Number(productstatusId),
             payimg: req.file ? req.file.filename : null,
             comment,
+            sendlocationId: sendlocationId ? Number(sendlocationId) : null,
             userCode: req.user.code,
           },
         });

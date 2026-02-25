@@ -73,6 +73,18 @@ model User {
   reviews           Review[]      @relation("userReviewRelation")
   productsFavorite  UserProduct[] @relation("userProductFavorite")
   productUserAction Product[]     @relation("productUserAction")
+  fcmTokens         FcmToken[]
+}
+
+model FcmToken {
+  id       Int    @id @default(autoincrement())
+  userId   Int
+  user     User   @relation(fields: [userId], references: [id])
+  platform String @db.VarChar(255)
+  model    String @db.VarChar(255)
+  fcmtoken String @db.VarChar(255)
+
+  @@unique([userId, platform, model])
 }
 
 model Role {
@@ -257,9 +269,17 @@ model OrderStatus {
   productstatus   ProductStatus @relation(fields: [productstatusId], references: [id])
   comment         String?       @db.Text
   payimg          String?       @db.VarChar(255)
+  sendlocationId  Int?
+  sendlocation    SendLocation? @relation(fields: [sendlocationId], references: [id])
   userCode        String        @db.VarChar(255)
   user            User          @relation(fields: [userCode], references: [code], name: "userOrderStatus")
   createdAt       DateTime      @default(now()) @db.Timestamptz(0)
+}
+
+model SendLocation {
+  id            Int           @id @default(autoincrement())
+  name          String        @db.VarChar(255)
+  orderStatuses OrderStatus[]
 }
 
 model BankLogo {
