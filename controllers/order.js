@@ -1,12 +1,6 @@
 const prisma = require("../prisma/prisma");
 const moment = require("moment-timezone");
-const admin = require("firebase-admin");
-
-const serviceAccount = require("../config/firebase-service-account.json");
-
-admin.initializeApp({
-  credential: admin.credential.cert(serviceAccount),
-});
+const admin = require("../config/firebase");
 
 exports.create = async (req, res) => {
   try {
@@ -17,6 +11,7 @@ exports.create = async (req, res) => {
 
     // ✅ 1. ดึงข้อมูล product ทั้งหมดที่มีใน body เพื่อตรวจสอบ shopId และ percent
     const productIds = items.map((item) => item.productId);
+
     const products = await prisma.product.findMany({
       where: { id: { in: productIds } },
       select: { id: true, shopId: true, percent: true },
@@ -118,57 +113,66 @@ exports.create = async (req, res) => {
         });
 
         createdOrders.push(newOrder);
-
-        // ===============================
-        // 🔔 ส่ง Notification หาเจ้าของร้าน
-        // ===============================
-
-        const tokens =
-          newOrder.shop.user.fcmTokens
-            ?.map((t) => t.fcmtoken)
-            .filter(Boolean) || [];
-
-        if (tokens.length > 0) {
-          const message = {
-            notification: {
-              title: "ມີອໍເດີໃໝ່ເຂົ້າ",
-              body: `ມີອໍເດີໃໝ່ເລກທີ່ ${newOrder.orderNo} ຂອງ ${req.user.gender === "Male" ? "ທ່ານ" : "ທ່ານນາງ"} ${req.user.firstname} ${req.user.lastname}`,
-            },
-            data: {
-              orderId: String(newOrder.id),
-              type: "NEW_ORDER",
-            },
-            tokens,
-          };
-
-          const response = await admin
-            .messaging()
-            .sendEachForMulticast(message);
-
-          // 🔥 ลบ token ที่ invalid
-          if (response.failureCount > 0) {
-            const invalidTokens = [];
-
-            response.responses.forEach((resp, index) => {
-              if (!resp.success) {
-                invalidTokens.push(tokens[index]);
-              }
-            });
-
-            if (invalidTokens.length > 0) {
-              await tx.fcmToken.deleteMany({
-                where: { fcmToken: { in: invalidTokens } },
-              });
-            }
-          }
-
-          console.log(
-            `Notification sent to shop ${newOrder.shop.name}:`,
-            response.successCount,
-          );
-        }
       }
     });
+
+    // ===============================
+    // 4️⃣ SEND FCM (OUTSIDE TRANSACTION)
+    // ===============================
+
+    for (const order of createdOrders) {
+      try {
+        const tokens =
+          order.shop.user.fcmTokens?.map((t) => t.fcmtoken).filter(Boolean) ||
+          [];
+
+        if (tokens.length === 0) continue;
+
+        const message = {
+          notification: {
+            title: "ມີອໍເດີໃໝ່ເຂົ້າ",
+            body: `ມີອໍເດີໃໝ່ເລກທີ່ ${order.orderNo} ຂອງ ${
+              req.user.gender === "Male" ? "ທ່ານ" : "ທ່ານນາງ"
+            } ${req.user.firstname} ${req.user.lastname}`,
+          },
+          data: {
+            orderId: String(order.id),
+            type: "NEW_ORDER",
+          },
+          tokens,
+        };
+
+        const response = await admin.messaging().sendEachForMulticast(message);
+
+        // 🔥 ลบ invalid token (ใช้ prisma ปกติ ไม่ใช้ tx)
+        if (response.failureCount > 0) {
+          const invalidTokens = [];
+
+          response.responses.forEach((resp, index) => {
+            if (!resp.success) {
+              invalidTokens.push(tokens[index]);
+            }
+          });
+
+          if (invalidTokens.length > 0) {
+            await prisma.fcmToken.deleteMany({
+              where: {
+                fcmtoken: { in: invalidTokens },
+              },
+            });
+          }
+        }
+
+        console.log(
+          `Notification sent to shop ${order.shop.name}:`,
+          response.successCount,
+        );
+      } catch (fcmError) {
+        console.error("FCM Error:", fcmError);
+      }
+    }
+
+    // ===============================
 
     res.json({
       message: "Orders created successfully!",
@@ -492,6 +496,7 @@ exports.getById = async (req, res) => {
             },
             comment: true,
             payimg: true,
+            sendlocation: true,
             user: {
               select: {
                 id: true,
