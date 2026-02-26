@@ -101,12 +101,12 @@ exports.create = (req, res) => {
       if (order.userCode === req.user.code) {
         // ส่งไป shop
         if (shoptoken?.user?.fcmTokens?.length > 0) {
-          tokens = shoptoken.user.fcmTokens.map((t) => t.token);
+          tokens = shoptoken.user.fcmTokens.map((t) => t.fcmtoken);
         }
       } else {
         // ส่งไป user
         if (usertoken?.fcmTokens?.length > 0) {
-          tokens = usertoken.fcmTokens.map((t) => t.token);
+          tokens = usertoken.fcmTokens.map((t) => t.fcmtoken);
         }
       }
 
@@ -136,7 +136,7 @@ exports.create = (req, res) => {
           if (invalidTokens.length > 0) {
             await prisma.fcmToken.deleteMany({
               where: {
-                token: { in: invalidTokens },
+                fcmtoken: { in: invalidTokens },
               },
             });
           }
