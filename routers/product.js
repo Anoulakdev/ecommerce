@@ -4,6 +4,7 @@ const router = express.Router();
 // controllers
 const {
   list,
+  listpopular,
   getProduct,
   getById,
   create,
@@ -17,6 +18,8 @@ const {
 const { auth, checkRole } = require("../middleware/auth");
 
 router.get("/products", auth, checkRole([3]), list);
+
+router.get("/products/productpopular", auth, checkRole([3]), listpopular);
 
 router.get("/products/listuser", auth, checkRole([3]), listUser);
 
@@ -34,7 +37,7 @@ router.put(
   "/products/approved/:productId",
   auth,
   checkRole([4]),
-  actionapproved
+  actionapproved,
 );
 
 router.delete("/products/:productId", auth, checkRole([3]), remove);

@@ -113,7 +113,7 @@ exports.create = (req, res) => {
       if (tokens.length > 0) {
         const message = {
           notification: {
-            title: psname?.name || "Order Update",
+            title: psname?.name,
             body: `ເລກທີ່ອໍເດີ ${order.orderNo}`,
           },
           data: {

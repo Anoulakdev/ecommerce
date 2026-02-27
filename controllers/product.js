@@ -156,6 +156,122 @@ exports.list = async (req, res) => {
   }
 };
 
+exports.listpopular = async (req, res) => {
+  try {
+    // 🔹 1️⃣ หา shop ของ user (ถ้ามี)
+    const shop = await prisma.user.findUnique({
+      where: { code: req.user.code },
+      include: {
+        shop: {
+          select: { id: true },
+        },
+      },
+    });
+
+    const shopId = shop?.shop?.id || null;
+
+    // 🔹 2️⃣ group ยอดขาย เฉพาะ order ที่สำเร็จ (status = 7)
+    const bestSeller = await prisma.orderDetail.groupBy({
+      by: ["productId"],
+      where: {
+        productId: { not: null },
+        order: {
+          currentStatusId: 7, // ✅ เฉพาะออเดอร์ที่สำเร็จ
+        },
+      },
+      _sum: {
+        quantity: true,
+      },
+      orderBy: {
+        _sum: {
+          quantity: "desc",
+        },
+      },
+    });
+
+    if (bestSeller.length === 0) {
+      return res.json([]);
+    }
+
+    const productIds = bestSeller.map((item) => item.productId);
+
+    // 🔹 3️⃣ ดึงข้อมูล product
+    const products = await prisma.product.findMany({
+      where: {
+        id: { in: productIds },
+        approved: 2,
+        ...(req.query.categoryId
+          ? { categoryId: Number(req.query.categoryId) }
+          : {}),
+        ...(shopId
+          ? {
+              NOT: {
+                shopId: shopId,
+              },
+            }
+          : {}),
+      },
+      include: {
+        category: true,
+        productunit: true,
+        shop: {
+          select: {
+            id: true,
+            name: true,
+            tel: true,
+          },
+        },
+        reviews: {
+          select: { rating: true },
+        },
+        users: {
+          where: {
+            userCode: req.user.code,
+          },
+          select: { productId: true },
+        },
+      },
+    });
+
+    // 🔹 4️⃣ เรียงตามลำดับยอดขาย
+    const sortedProducts = productIds
+      .map((id) => products.find((p) => p.id === id))
+      .filter(Boolean);
+
+    // 🔹 5️⃣ format response
+    const formatted = sortedProducts.map((product) => {
+      const saleData = bestSeller.find((b) => b.productId === product.id);
+
+      const ratings = product.reviews
+        .map((r) => r.rating)
+        .filter((r) => r !== null);
+
+      const avgRating =
+        ratings.length > 0
+          ? (ratings.reduce((sum, r) => sum + r, 0) / ratings.length).toFixed(1)
+          : null;
+
+      return {
+        ...product,
+        totalSold: saleData?._sum.quantity || 0, // ✅ จำนวนขาย
+        avgRating,
+        favorite: product.users.length > 0,
+        createdAt: moment(product.createdAt)
+          .tz("Asia/Vientiane")
+          .format("YYYY-MM-DD HH:mm:ss"),
+        updatedAt: moment(product.updatedAt)
+          .tz("Asia/Vientiane")
+          .format("YYYY-MM-DD HH:mm:ss"),
+      };
+    });
+
+    res.json(formatted);
+  } catch (err) {
+    console.log(err);
+    res.status(500).json({ message: "Server Error" });
+  }
+};
+
 exports.listUser = async (req, res) => {
   try {
     const products = await prisma.product.findMany({
@@ -385,7 +501,7 @@ exports.update = async (req, res) => {
           const oldProductFilePath = path.join(
             process.env.UPLOAD_BASE_PATH,
             "product",
-            path.basename(products.pimg)
+            path.basename(products.pimg),
           );
           fs.unlink(oldProductFilePath, (err) => {
             if (err) {
@@ -441,7 +557,7 @@ exports.remove = async (req, res) => {
       const productfilePath = path.join(
         process.env.UPLOAD_BASE_PATH,
         "product",
-        products.pimg
+        products.pimg,
       );
       fs.unlink(productfilePath, (err) => {
         if (err) {
