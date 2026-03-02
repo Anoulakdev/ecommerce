@@ -133,6 +133,9 @@ exports.profile = async (req, res) => {
       where: {
         code: req.user.code, // Use the user ID from the decoded token
       },
+      include: {
+        shop: true,
+      },
     });
 
     // If the user does not exist, return a 404 error
